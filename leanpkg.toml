@@ -1,0 +1,7 @@
+[package]
+name = "subtask"
+version = "0.1"
+lean_version = "master"
+path = "src"
+
+[dependencies]
