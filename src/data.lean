@@ -1,14 +1,9 @@
 -- Following S.E.Morrison's conventions set out in `lean-tidy` whenever possible.
-import .graph
+import .graph 
 open tactic
 
-meta structure rule := 
-(e : expr)
-(prf : tactic expr)
 
-meta instance : has_lt rule := ⟨λ ⟨e₁,_⟩ ⟨e₂,_⟩, e₁ < e₂⟩
-meta instance rule.has_decidable_lt : decidable_rel ((<) : rule → rule → Prop)
-|⟨e₁,_⟩ ⟨e₂,_⟩  := dite (e₁ < e₂) (is_true) (is_false)
+
 
 namespace robot
 
@@ -74,7 +69,22 @@ meta structure state :=
 
 namespace state 
 
-meta def create_lookahead : simp_lemmas → expr → list rule := sorry
+meta def lookahead_config : simp_config := 
+{ fail_if_unchanged := ff
+, single_pass := tt
+}
+
+
+
+/- 
+How creating lookaheads works:
+
+ -/
+
+
+  -- ext_simplify_core [] lookahead_config lem (λ a, failed) (λ a l n o e,
+  --   _
+  -- ) (λ a l n o e, pure ⟨a,e,none,ff⟩) `eq e
 meta def select_strategy : strategy → state → state :=
   -- 1. find the strategy in the list
   -- 2. remove it. remove all of its piers
