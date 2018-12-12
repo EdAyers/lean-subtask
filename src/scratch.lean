@@ -1,4 +1,4 @@
-import .rule
+import .rule .zipper
 /- Investigating how simp_lemmas works -/
 
 namespace scratch1
@@ -16,7 +16,26 @@ axiom IR : e ∙ x = x
 axiom NL : e = i(x) ∙ x 
 axiom NR : x ∙ i(x) = e
 axiom WTF : x = e → x ∙ x = x
+noncomputable instance G_has_mul : has_mul G := ⟨p⟩
+constants (a b c : G)
 open tactic
+open ez ez.zipper
+
+run_cmd (do
+    n ← mk_fresh_name,
+    let e := `(a * b),
+    get_fun_info (expr.get_app_fn e) >>= trace,
+    let x := ez.zipper.zip e,
+    ⟨f,zs⟩ ← x.down_proper,
+    trace f,
+    -- x ← x.app_left,
+    x ← x.app_right,
+    trace x.current,
+    C ← ez.zipper.mk_congr x,
+    trace C,
+    infer_type C >>= trace,
+    pure ()
+)
 
 /- The holdup:
 `to_expr` is applying the implicit variables.
@@ -56,7 +75,7 @@ meta def SLs := pure [``A,``IL,``IR,``NL,``NR] >>= list.mfoldl simp_lemmas.add_s
 --     let args := get_app_args e,
 --     cgr_lemma ← mk_congr_lemma_simp fn (some args.length),
 --     -- for each proper argument. (that is, not a type and not a member of a subsingleton and explicit)
-
+universes u v
 
 meta def create_lookahead (lem : simp_lemmas) (e : expr) :=
   simp_lemmas.rewrites lem e >>= trace
