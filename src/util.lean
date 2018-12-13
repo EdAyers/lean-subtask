@@ -14,3 +14,9 @@ meta def tactic.fabricate (type : option expr) (strat : tactic unit) : tactic ex
     when (n≠0) (fail "fabrication failed: there are unsolved goals."),
     set_goals gs,
     instantiate_mvars new_g
+
+meta def expr.binding_body_all : expr → option expr
+|(expr.pi _ _ _ b) :=  some b
+|(expr.lam _ _ _ b) := some b
+|(expr.elet _ _ _ b) :=some b
+|_ := none
