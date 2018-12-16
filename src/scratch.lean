@@ -1,4 +1,4 @@
-import .rule .zipper
+import .rule .zipper .rule_table
 /- Investigating how simp_lemmas works -/
 
 namespace scratch1
@@ -69,7 +69,7 @@ meta def rules := do
     target >>= trace,
     let axs := [``A,``IL,``IR,``NL,``NR, ``WTF],
     axs ← axs.mmap resolve_name,
-    axs ← axs.mmap (λ p, to_expr p tt ff), -- The rule is that if the variables are implicit then `to_expr` of the proof will automatically unfold the telescope.
+    axs ← axs.mmap (λ p, to_expr p.mk_explicit tt ff), -- The rule is that if the variables are implicit then `to_expr` of the proof will automatically unfold the telescope.
     axs.mmap infer_type >>= trace,
     axs ← axs.mmap rule.of_prf,
     --revs ← axs.mmap (λ r, rule.flip r),
@@ -77,7 +77,15 @@ meta def rules := do
 
 run_cmd  rules >>= trace
 
-meta def SLs := pure [``A,``IL,``IR,``NL,``NR, ``A_rev,``IL_rev,``IR_rev,``NL_rev,``NR_rev] >>= list.mfoldl simp_lemmas.add_simp simp_lemmas.mk
+meta def SLs := 
+    pure [``A,``IL,``IR,``NL,``NR, ``A_rev,``IL_rev,``IR_rev,``NL_rev,``NR_rev] 
+    >>= list.mmap (λ x, 
+            resolve_name x
+            >>= (pure ∘ pexpr.mk_explicit)
+            >>= to_expr
+            >>= rule.of_prf
+        )
+    >>= (pure ∘ rule_table.of_rules)
 
 -- meta def traverse_congruence :=
 -- do
@@ -87,19 +95,6 @@ meta def SLs := pure [``A,``IL,``IR,``NL,``NR, ``A_rev,``IL_rev,``IR_rev,``NL_re
 --     -- for each proper argument. (that is, not a type and not a member of a subsingleton and explicit)
 universes u v
 
-meta def create_lookahead_raw (lem : simp_lemmas) : zipper → list (expr × expr) → tactic (list (expr × expr))
-|z acc := do
-    -- trace "hello",
-    head_rewrites ← simp_lemmas.rewrites lem (z.current),
-    -- trace head_rewrites,
-    head_rewrites ← head_rewrites.mmap (λ rw, zipper.apply_congr rw z),
-    -- trace head_rewrites,
-    ⟨f,children⟩ ← zipper.down_proper z,
-    child_rewrites ← list.mfoldl (λ acc z, create_lookahead_raw z acc) acc children,
-    pure $ head_rewrites ++ child_rewrites
-
-meta def create_lookahead (lem : simp_lemmas) :  expr → tactic (list (expr × expr))
-|e := create_lookahead_raw lem (zipper.zip e) []
 
 set_option trace.simp_lemmas true
 
@@ -115,9 +110,15 @@ run_cmd do
 run_cmd do
     sl ← SLs,
     trace sl,
-    ls ← create_lookahead sl `((e ∙ e) ∙ (e ∙ e)),
+    t ← to_expr ```(Π x :G, true) >>= mk_meta_var,
+    exact `(trivial),
+    set_goals [t],
+    x ← intro `a,
+    --trace_state,
+    ls ← rule_table.rewrites `(e ∙ %%x) sl,
     trace ls,
-    ls.mmap (λ ⟨_,p⟩, infer_type p) >>= trace
+    exact `(trivial),
+    pure ()
     
 run_cmd do sls ← SLs, trace sls
 

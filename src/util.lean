@@ -1,5 +1,9 @@
 open tactic
 
+universes u v
+variables {α : Type u} {β : Type v}
+
+
 meta def new_goal : option expr → tactic expr
 |none := mk_mvar
 |(some e) := mk_meta_var e
@@ -20,3 +24,9 @@ meta def expr.binding_body_all : expr → option expr
 |(expr.lam _ _ _ b) := some b
 |(expr.elet _ _ _ b) :=some b
 |_ := none
+
+def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
+|[] := pure []
+|(h::t) := pure (λ fh rest, option.cases_on fh rest (λ fh,fh::rest)) 
+            <*> (some <$> f h <|> pure none) 
+            <*> list.mcollect t

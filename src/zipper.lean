@@ -1,5 +1,5 @@
 /- Expression zipper -/
-import .util
+import .util .rule
 namespace ez
 
 meta inductive path
@@ -170,6 +170,15 @@ namespace zipper
             refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf)
         ),
         pure (rhs',pf')
+    meta def apply_rule : rule → zipper → tactic rule := λ r z, do
+        r ← r.head_rewrite z.current,
+        (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
+        --tactic.infer_type pf' >>= trace,
+        --trace pf',
+        r' ← rule.of_prf pf',
+        --trace "hello",
+        pure r'
+
     meta def apply_conv : conv unit → zipper → conv unit := λ cnv z, do
         let lhs := z.current,
         T ← tactic.infer_type lhs,
