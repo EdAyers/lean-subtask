@@ -34,4 +34,6 @@ namespace rule
 
     meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
 
+    #check tactic.rewrite
+
 end rule

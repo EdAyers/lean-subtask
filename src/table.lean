@@ -97,6 +97,7 @@ meta def tabledict (κ : Type) (α : Type)
 
 namespace tabledict 
     variables {κ α : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] [has_lt α] [decidable_rel ((<) : α → α → Prop)]
+    meta def empty : tabledict κ α := dict.empty
     meta def insert : κ → α → tabledict κ α → tabledict κ α := λ k a d, dict.modify_default ∅ (λ t, t.insert a) k d
     meta def erase : κ → α → tabledict κ α → tabledict κ α := λ k a d, dict.modify_when_present (λ t, t.erase a) k d
     meta def get : κ → tabledict κ α → table α := λ k t, dict.get_default ∅ k t

@@ -101,6 +101,16 @@ meta def create_lookahead_raw (lem : simp_lemmas) : zipper → list (expr × exp
 meta def create_lookahead (lem : simp_lemmas) :  expr → tactic (list (expr × expr))
 |e := create_lookahead_raw lem (zipper.zip e) []
 
+set_option trace.simp_lemmas true
+
+run_cmd do
+    let sl := simp_lemmas.mk,
+    sl ←  sl.add_simp ``NL,
+    sl ←  sl.add_simp ``IL,
+    sl ←  sl.add_simp ``IL_rev,
+    sl ←  sl.add_simp ``NL_rev,
+    trace sl,
+    pure ()
 
 run_cmd do
     sl ← SLs,
