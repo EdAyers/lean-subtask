@@ -3,19 +3,19 @@ import .util
 namespace ez
 
 meta inductive path
-|app_left (left : unit) (right : expr) : path
-|app_right (left : expr) (right : unit) : path
-|lam_var_type (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
-|lam_body (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
-|pi_var_type (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
-|pi_body (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
-|elet_type (var_name : name) (type : unit) (assignment : expr) (body : expr) : path
-|elet_assignment (var_name : name) (type : expr) (assignment : unit) (body : expr) : path
-|elet_body (var_name : name) (type : expr) (assignment : expr) (body : unit) : path
+|app_left        (left : unit) (right : expr) : path
+|app_right       (left : expr) (right : unit) : path
+|lam_var_type    (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
+|lam_body        (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
+|pi_var_type     (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
+|pi_body         (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
+|elet_type       (var_name : name) (type : unit) (assignment : expr)    (body : expr) : path
+|elet_assignment (var_name : name) (type : expr) (assignment : unit)    (body : expr) : path
+|elet_body       (var_name : name) (type : expr) (assignment : expr)    (body : unit) : path
 
 /-- A context entry. -/
 meta inductive src
-|Hyp (n : name) (bi : binder_info) (type : expr) : src
+|Hyp      (n : name) (bi : binder_info) (type : expr)  : src
 |Assigned (n : name) (type : expr) (assignment : expr) : src
 namespace src
     meta def type : src → expr
