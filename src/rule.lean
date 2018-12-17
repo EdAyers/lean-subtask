@@ -13,14 +13,14 @@ namespace rule
     meta instance rule.has_decidable_lt : decidable_rel ((<) : rule → rule → Prop)
     := by apply_instance
     meta instance : has_to_string rule := ⟨λ r, (to_string r.lhs) ++ " = " ++ (to_string r.rhs)⟩
-    meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= tactic_format_expr⟩
+    meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= whnf >>= tactic_format_expr⟩
 
     meta def as_pis: expr → (list expr × expr)
     | (expr.pi _ _ y b) := let ⟨ys,b⟩ := as_pis b in ⟨y::ys,b⟩
     | x := ⟨[],x⟩
 
     meta def of_prf : expr → tactic rule := λ pf, do
-        t ← infer_type pf,
+        t ← infer_type pf >>= whnf,
         ⟨telescope,`(%%lhs = %%rhs)⟩ ← pure $ as_pis t,
         pure {telescope := telescope, lhs := lhs, rhs := rhs, pf := pf}
 
@@ -33,6 +33,21 @@ namespace rule
         pure {telescope := r.telescope, lhs := r.rhs, rhs := r.lhs, pf := pf}
 
     meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
+
+    meta def head_rewrite : rule → expr → tactic rule := λ r lhs, do
+        T ← tactic.infer_type lhs,
+        rhs ← tactic.mk_meta_var T,
+        target ← tactic.mk_app `eq [lhs,rhs],
+        pf ← tactic.fabricate target ( do
+                lhspp ← pp lhs,
+                rulepp ← pp r,
+                trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
+                tactic.apply r.pf,
+                --trace_state,
+                --result >>= trace,
+                pure ()
+            ), -- if new goals are created then tactic.fabricate will throw.
+        of_prf pf
 
     #check tactic.rewrite
 
