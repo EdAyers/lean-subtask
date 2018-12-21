@@ -13,6 +13,7 @@ variable (E : Type)
 /-- `edge_col V E` identifies a set of child vertices for each edge. -/
 meta class edge_col :=
 (children : E → list V)
+(filter : (V → bool) → E → E)
 -- [TODO] consult with knowledgable people to see if this can be made more efficient. There is probably some task-dependent structure that I am not taking advantage of.
 /-- A directed graph represented as a dictionary of adjacency lists.  -/
 meta structure digraph [edge_col V E] :=
@@ -38,6 +39,8 @@ meta def set (v : V) (e : E) (g : G) : G :=
     { edges := dict.insert v e g.edges
     , parents := parents
     }
+
+
 meta def unset (v : V) (g : G) : G :=
     { edges := dict.erase v g.edges
     , parents := list.foldl (λ parents child, dict.modify_when_present (table.erase v) child parents) g.parents (g.get_children v)
@@ -52,6 +55,12 @@ private meta def is_ancestor_aux (g : G) (v₁ : V) : Π (front : list V) (visit
 meta def is_ancestor (v₁ v₂ : V) (g : G) := is_ancestor_aux g v₁ [v₂] ∅
 /-- Returns tt if there exists a (non-reflexive) directed path `v -> -> v`. -/
 meta def has_loop (v : V) (g : G) := is_ancestor_aux g v (table.to_list (get_parents v g)) ∅
-
+meta def contains (v : V) (g : G) : bool := v ∈ g.edges
+meta instance : has_mem V G := ⟨λ v g, contains v g⟩
+meta instance {v:V}{g:G} : decidable (v ∈ g) := by apply_instance
+meta def set_no_loops (v : V) (e : E) (g : G) :=
+    let new_e := edge_col.filter (λ c, (c ∉ g) || (bnot $ has_loop c g)) e in
+    set v new_e g
+    
 end
 end digraph

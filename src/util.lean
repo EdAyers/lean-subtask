@@ -3,6 +3,7 @@ open tactic
 universes u v
 variables {α : Type u} {β : Type v}
 
+meta def notimpl : α := undefined_core "not implemented"
 
 meta def new_goal : option expr → tactic expr
 |none := mk_mvar

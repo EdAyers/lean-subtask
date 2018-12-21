@@ -26,6 +26,7 @@ namespace table
     meta instance has_mem : has_mem α (table α) := ⟨λ x T, contains x T⟩
     meta instance {x : α} {T : table α} : decidable (x ∈ T) := dite (contains x T) is_true is_false
     meta def insert : α → table α → table α := λ a t, rb_set.insert t a
+    meta def insert_many : list α → table α → table α := λ xs t, xs.foldl (λ t x, insert x t) t
     meta instance has_insert : has_insert α (table α) := ⟨insert⟩
     meta def erase : α → table α → table α := λ x t, rb_set.erase t x
     meta def fold {β} : (α → β → β) → β → table α → β  := λ r z t, rb_set.fold t z r
@@ -60,6 +61,8 @@ namespace dict
     meta def insert : k → α → dict k α → dict k α := λ k a d, rb_map.insert d k a
     meta def get : k → dict k α → option α := λ k d, rb_map.find d k
     meta def contains : k → dict k α → bool := λ k d, rb_map.contains d k
+    meta instance : has_mem k (dict k α) := ⟨λ k d, contains k d⟩
+    meta instance (key : k) (d : dict k α) : decidable (key ∈ d) := by apply_instance
     meta def modify (f : option α → α) (key : k) (d : dict k α) : dict k α := insert key (f $ get key d) d
     meta def modify_default (default : α) (f : α → α) : k → dict k α → dict k α := modify (λ o, f $ option.get_or_else o default)
     meta def modify_when_present (f : α → α) : k → dict k α → dict k α := λ key d, option.rec_on (get key d) d (λ a, insert key a d)

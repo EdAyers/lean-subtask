@@ -101,7 +101,7 @@ namespace zipper
     meta def map : (expr → expr) → zipper → zipper
     |f ⟨p,ctxt,e⟩ := ⟨p,ctxt,f e⟩
     meta def mmap {T} [monad T] : (expr → T expr) → zipper → T zipper
-    |f ⟨p,ctxt,e⟩ := do e ← f e, pure ⟨p,ctxt,e⟩
+    |f ⟨p,ctxt,e⟩ := zipper.mk p ctxt <$> f e
     /--The number of binders above the cursor. -/
     meta def depth : zipper → ℕ := list.length ∘ zipper.ctxt
     meta def unzip_with : expr → zipper → expr := λ e z, unzip $ z.set_current e

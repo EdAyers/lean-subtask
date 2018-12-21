@@ -1,17 +1,18 @@
-import .data .util
+import .util
 open tactic
 
 meta structure rule := -- relation is always `=` for now.
-(telescope : list expr) -- arguments.
+(telescope : list expr) -- arguments, local context.
 (lhs : expr) 
 (rhs : expr)
-(pf : expr)
+(pf : expr) -- the proof expression of the given rule. Note that sometimes 
 
 namespace rule
     -- potential [BUG] what if the same rule exists with the parameters in a different order? this is just annoying so I will ignore for now.
-    meta instance : has_lt rule := ⟨λ r1 r2, (r1.lhs,r1.rhs) < (r2.lhs,r2.rhs)⟩
-    meta instance rule.has_decidable_lt : decidable_rel ((<) : rule → rule → Prop)
-    := by apply_instance
+    meta instance has_lt : has_lt rule := ⟨λ r1 r2, (r1.lhs,r1.rhs) < (r2.lhs,r2.rhs)⟩
+    meta instance has_decidable_lt : decidable_rel ((<) : rule → rule → Prop)
+        := by apply_instance
+
     meta instance : has_to_string rule := ⟨λ r, (to_string r.lhs) ++ " = " ++ (to_string r.rhs)⟩
     meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= whnf >>= tactic_format_expr⟩
 
@@ -41,14 +42,12 @@ namespace rule
         pf ← tactic.fabricate target ( do
                 lhspp ← pp lhs,
                 rulepp ← pp r,
-                trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
+                --trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
                 tactic.apply r.pf,
                 --trace_state,
                 --result >>= trace,
                 pure ()
             ), -- if new goals are created then tactic.fabricate will throw.
         of_prf pf
-
-    #check tactic.rewrite
 
 end rule
