@@ -115,7 +115,7 @@ run_cmd do
     set_goals [t],
     x ← intro `a,
     --trace_state,
-    ls ← rule_table.rewrites `((e ∙ %%x) ∙ (e ∙ e)) sl,
+    ls ← rule_table.rewrites `((e ∙ %%x) ∙ (e ∙ %%x)) sl,
     trace ls,
     exact `(trivial),
     pure ()

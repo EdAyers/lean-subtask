@@ -50,4 +50,8 @@ namespace rule
             ), -- if new goals are created then tactic.fabricate will throw.
         of_prf pf
 
+    meta def match_rhs : expr → rule → tactic unit
+    |e r := do
+        notimpl
+
 end rule
