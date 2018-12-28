@@ -20,6 +20,11 @@ meta def tactic.fabricate (type : option expr) (strat : tactic unit) : tactic ex
     set_goals gs,
     instantiate_mvars new_g
 
+/--Throw away the main goal. -/
+meta def tactic.ignore : tactic unit := do
+    g::gs ← get_goals | pure (),
+    set_goals gs
+
 open interaction_monad.result
 
 /--Perform `tac`, but throw away the state afterwards. -/
@@ -35,6 +40,10 @@ meta def expr.binding_body_all : expr → option expr
 |(expr.lam _ _ _ b) := some b
 |(expr.elet _ _ _ b) :=some b
 |_ := none
+
+meta def expr.is_mvar : expr → bool
+|(expr.mvar _ _ _) := tt
+|_ := ff
 
 def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []

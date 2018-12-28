@@ -117,7 +117,7 @@ meta def refinement := list task × list strategy
 meta def task.test : task → M bool
 |(task.Create e) := do ce ← get_ce, pure $ expr.occurs e ce
 |_ := notimpl
-meta def strategy.of_rule : rule → M strategy := notimpl
+meta def strategy.of_rule : rule → M strategy := λ r, pure $ strategy.Use $ r
 
 meta def task.diom : task → M (list strategy) := λ t, do
     ce ← get_ce,
@@ -141,10 +141,17 @@ meta def task.refine : task → M refinement
 |(task.Create e) := do
     ce ← get_ce,
     -- if we can create in one move, do it.
-    dioms ← task.diom (task.Create e),
-    pure ([],[])
     -- A. If we can create ce in one move, expose those
-    -- B. If we can 
+    dioms ← task.diom (task.Create e),
+    if ¬ dioms.empty then pure ([], dioms) else do
+    -- B. Look for rules which will create the given term.
+    rt ← get_rule_table,
+    submatches ← rt.submatch e,
+    strats ← list.mmap strategy.of_rule $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
+    pure $ ([],strats)
+    -- [TODO] take each rule in rt, find an application of the rule that will cause a subterm of the rhs to be `e`
+    -- [TODO] is there a way of doing this that doesn't require one to search through every single rule?
+    -- I think the only way is going to be to traverse a rule when it is added and it to a dictionary "symbol ⇀ rule × zipper". 
 |(task.CreateAll a) := notimpl
 
 meta def strategy.execute : strategy → conv unit := notimpl

@@ -77,7 +77,7 @@ meta def rules := do
 
 run_cmd  rules >>= trace
 
-meta def SLs := 
+meta def SLs : tactic rule_table := 
     pure [``A,``IL,``IR,``NL,``NR, ``A_rev,``IL_rev,``IR_rev,``NL_rev,``NR_rev] 
     >>= list.mmap (λ x, 
             resolve_name x
@@ -85,7 +85,7 @@ meta def SLs :=
             >>= to_expr
             >>= rule.of_prf
         )
-    >>= (pure ∘ rule_table.of_rules)
+    >>= (rule_table.of_rules)
 
 -- meta def traverse_congruence :=
 -- do
@@ -108,13 +108,34 @@ run_cmd do
     pure ()
 
 run_cmd do
+    exact `(trivial),
+    t ← mk_mvar,
+    set_goals [t],
+    to_expr ```(Π y:G, ((λ x : G, x = y) $ _)) tt ff >>= change,
+    intro `y,
+    tactic.assert `hello `(true), tactic.swap,
+    trace_state,
+    --refine ```(rfl),
+    pure ()
+
+run_cmd do
+    ⟨lx,x⟩ ← mk_local_pis `(Π (x:G), (e ∙ e ∙ x) = x),
+    mv ← mk_mvar,
+    mv₂ ← mk_mvar,
+    set_goals [mv],
+    -- change `(Π y:G, %%mv₂),
+    apply ```(λ y:G, _),
+    trace_state,
+    pure ()
+
+run_cmd do
     sl ← SLs,
     trace sl,
+    trace sl.symbol_table,
     t ← to_expr ```(Π x :G, true) >>= mk_meta_var,
     exact `(trivial),
     set_goals [t],
     x ← intro `a,
-    --trace_state,
     ls ← rule_table.rewrites `((e ∙ %%x) ∙ (e ∙ %%x)) sl,
     trace ls,
     exact `(trivial),

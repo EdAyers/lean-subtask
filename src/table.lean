@@ -41,8 +41,9 @@ namespace table
     meta def filter (p : α → bool) : table α → table α := fold (λ k t, if p k then insert k t else t) empty
     meta instance [has_to_string α] : has_to_string (table α) := ⟨λ t, (λ s, "{|" ++ s ++ "|}") $ list.to_string $ to_list $ t⟩
     meta instance has_to_tactic_format [has_to_tactic_format α] : has_to_tactic_format (table α) := 
-        -- [TODO] only print the first 10 elements or so.
-        ⟨λ t, mfold (λ a f, do ap ← tactic.pp a, pure $ f ++ ap ++ ", ") ("") t >>= (λ f, pure $ "{|" ++ f ++ "|}" ) ⟩
+        ⟨λ t, do
+            items ← t.to_list.mmap (tactic.pp),
+            pure $ to_fmt "{" ++ (format.group $ format.nest 1 $ format.join $ list.intersperse ("," ++ format.line) $ items ) ++ "}"⟩
     meta def are_equal [decidable_eq α] : table α → table α → bool := (λ l₁ l₂, l₁ = l₂) on (to_list)
     -- meta instance [decidable_eq α] {t₁ t₂ : table α} : decidable (t₁ = t₂) := dite (are_equal t₁ t₂) (is_true) (is_false)
     /-- A total ordering on tables. -/
@@ -78,7 +79,17 @@ namespace dict
     meta def choose {β} (f : k → α → option β) := fold (λ k a d, match f k a with (some b) := insert k b d | none := d end) empty
     meta def keys : dict k α → table k := fold (λ k v acc, table.insert k acc) ∅
     meta def to_list : dict k α → list (k×α) := rb_map.to_list
-    meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
+    section formatting
+        open format
+        meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
+        -- meta instance has_to_format [has_to_format α] [has_to_format k] : has_to_format (dict k α) := ⟨λ d, 
+        --     to_fmt "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ list.map (λ (p:k×α), to_fmt p.1 ++ " ↦ " ++ to_fmt p.2) $ dict.to_list d) ++ to_fmt "}"
+        -- ⟩
+        meta instance has_to_tactic_format [has_to_tactic_format α] [has_to_tactic_format k] : has_to_tactic_format (dict k α) := ⟨λ d, do
+            items ← list.mmap (λ (p:k×α), do f1 ← tactic.pp p.1, f2 ← tactic.pp p.2, pure $ f1 ++ line ++ "↦ " ++ nest 3 (f2)) (to_list d),
+            pure $ "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ items) ++ "}"
+         ⟩
+    end formatting
 end dict
 
 /--dictionary with a default if it doesn't exist. You define the default when you make the dictionary. -/
@@ -91,7 +102,6 @@ namespace dictd
   meta def get (key : k) (dd : dictd k α) : α := dict.get_default (dd.2 key) key dd.1
   meta def insert (key : k) (a : α) (dd : dictd k α) : dictd k α := ⟨dict.insert key a dd.1, dd.2⟩
   meta def modify (f : α → α) (key : k) (dd : dictd k α) : dictd k α := ⟨dict.modify (λ o, f $ option.get_or_else o (dd.2 key)) key dd.1, dd.2⟩
-
 end dictd
 
 meta def tabledict (κ : Type) (α : Type) 
@@ -101,8 +111,24 @@ meta def tabledict (κ : Type) (α : Type)
 namespace tabledict 
     variables {κ α : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] [has_lt α] [decidable_rel ((<) : α → α → Prop)]
     meta def empty : tabledict κ α := dict.empty
+    meta instance : has_emptyc (tabledict κ α) := ⟨empty⟩
     meta def insert : κ → α → tabledict κ α → tabledict κ α := λ k a d, dict.modify_default ∅ (λ t, t.insert a) k d
     meta def erase : κ → α → tabledict κ α → tabledict κ α := λ k a d, dict.modify_when_present (λ t, t.erase a) k d
     meta def get : κ → tabledict κ α → table α := λ k t, dict.get_default ∅ k t
     meta def contains : κ → α → tabledict κ α → bool := λ k a d,  match dict.get k d with |(some t) := t.contains a | none := ff end
+    meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (tabledict κ α) := ⟨λ (d : dict κ (table α)), tactic.pp d⟩
+
 end tabledict
+
+meta def listdict (κ : Type) (α : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] : Type := dict κ (list α)
+
+namespace listdict
+    variables {κ α : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)]
+    meta def empty : listdict κ α := dict.empty
+    meta instance : has_emptyc (listdict κ α) := ⟨empty⟩
+    meta def insert : κ → α → listdict κ α → listdict κ α | k a d := dict.modify_default [] (λ t, a :: t) k d
+    meta def pop : κ → listdict κ α → option (α × listdict κ α) | k d := match dict.get_default [] k d with |[] := none |(h::t) := some (h, dict.insert k t d)  end
+    meta def get : κ → listdict κ α → list α | k d := dict.get_default [] k d
+    -- meta instance [has_to_format κ] [has_to_format α] : has_to_format (listdict κ α) := ⟨λ (d : dict κ (list α)), to_fmt d⟩
+    meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (listdict κ α) := ⟨λ (d : dict κ (list α)), tactic.pp d⟩
+end listdict

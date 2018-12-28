@@ -1,8 +1,10 @@
 import .util
 open tactic
-
+meta structure hyp :=
+(n : name) (bi : binder_info) (type : expr)
+meta def telescope := list hyp
 meta structure rule := -- relation is always `=` for now.
-(telescope : list expr) -- arguments, local context.
+(ctxt : telescope) -- arguments, local context.
 (lhs : expr) 
 (rhs : expr)
 (pf : expr) -- the proof expression of the given rule. Note that sometimes 
@@ -16,24 +18,25 @@ namespace rule
     meta instance : has_to_string rule := ⟨λ r, (to_string r.lhs) ++ " = " ++ (to_string r.rhs)⟩
     meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= whnf >>= tactic_format_expr⟩
 
-    meta def as_pis: expr → (list expr × expr)
-    | (expr.pi _ _ y b) := let ⟨ys,b⟩ := as_pis b in ⟨y::ys,b⟩
+    meta def as_pis : expr → (telescope × expr)
+    | (expr.pi n bi y b) := let ⟨ys,b⟩ := as_pis b in ⟨⟨n,bi,y⟩::ys,b⟩
     | x := ⟨[],x⟩
 
     meta def of_prf : expr → tactic rule := λ pf, do
         t ← infer_type pf >>= whnf,
-        ⟨telescope,`(%%lhs = %%rhs)⟩ ← pure $ as_pis t,
-        pure {telescope := telescope, lhs := lhs, rhs := rhs, pf := pf}
+        ⟨ctxt,`(%%lhs = %%rhs)⟩ ← pure $ as_pis t,
+        pure {ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf}
 
     meta def equality_type (r : rule) : tactic expr := to_expr ```(%%r.lhs = %%r.rhs)
 
     meta def flip (r : rule) : tactic rule := do
         p ← to_expr ```(%%r.rhs = %%r.lhs),
-        let type := expr.pis (r.telescope) p, 
+        let type := expr.pis (hyp.type <$> r.ctxt) p, 
         pf ← tactic.fabricate type (do intros, applyc `eq.symm, apply r.pf, pure ()),
-        pure {telescope := r.telescope, lhs := r.rhs, rhs := r.lhs, pf := pf}
+        pure {ctxt := r.ctxt, lhs := r.rhs, rhs := r.lhs, pf := pf}
 
     meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
+
 
     meta def head_rewrite : rule → expr → tactic rule := λ r lhs, do
         T ← tactic.infer_type lhs,
@@ -50,8 +53,11 @@ namespace rule
             ), -- if new goals are created then tactic.fabricate will throw.
         of_prf pf
 
+    /--`match_rhs e r` matches `e` with `r.rhs` (ie, metavariables in r.rhs can be assigned) and returns the result. New goals might be present. -/
     meta def match_rhs : expr → rule → tactic unit
     |e r := do
         notimpl
+
+    meta def is_wildcard : rule → bool := λ r, expr.is_var r.lhs || expr.is_mvar r.lhs
 
 end rule

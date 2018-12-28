@@ -17,20 +17,68 @@ meta inductive path
 meta inductive src
 |Hyp      (n : name) (bi : binder_info) (type : expr)  : src
 |Assigned (n : name) (type : expr) (assignment : expr) : src
+|Meta     (n : name) (type : expr)                     : src
 namespace src
     meta def type : src → expr
     |(Hyp _ _ t) := t
     |(Assigned _ t _) := t
+    |(Meta _ t) := t
     meta def name : src → name
     |(Hyp n _ _) := n
     |(Assigned n _ _) := n
+    |(Meta n _) := n
     meta def to_local : src → tactic expr
     |(Hyp n bi t) := tactic.mk_local' n bi t
     |(Assigned n t _) := tactic.mk_local' n binder_info.default t
-    meta def pis_of_ctxt : list src → expr → expr
-    |[] e := e
-    |((src.Hyp n bi y) :: t) e := pis_of_ctxt t $ expr.pi n bi y $ e
-    |((src.Assigned n y a) :: t) e := pis_of_ctxt t $ expr.elet n y a $ e
+    |(Meta n t) := tactic.mk_meta_var t
+    -- meta def pis_of_ctxt : list src → expr → expr
+    -- |[] e := e
+    -- |((src.Hyp n bi y) :: t) e := pis_of_ctxt t $ expr.pi n bi y $ e
+    -- |((src.Assigned n y a) :: t) e := pis_of_ctxt t $ expr.elet n y a $ e
+    -- |((src.Meta n y) ::t) e := pis_of_ctxt t $ expr.pi n binder_info.default y $ e -- [HACK] what should the behaviour be here?
+    meta def pexpr_pis_of_ctxt : list src → pexpr → pexpr
+    |[] e := to_pexpr e
+    |((src.Hyp n bi y) :: rest) e := pexpr_pis_of_ctxt rest $ @expr.pi ff n bi (to_pexpr y) $ e
+    |((src.Assigned n y a) :: rest) e := pexpr_pis_of_ctxt rest $ expr.elet n (to_pexpr y) (to_pexpr a) $ e
+    |((src.Meta n y) :: rest) e := pexpr_pis_of_ctxt rest $ expr.app (expr.lam n binder_info.default (to_pexpr y) e) pexpr.mk_placeholder
+    meta def hyps_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Hyp n bi y)
+    meta def mvars_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Meta n y)
+    
+    /--Aux fn for `introduce_context`.-/
+    private meta def mutate : list expr → list src → tactic (list expr)
+    |ctxt [] := pure ctxt
+    |ctxt ((Hyp n bi y)::rest) := do
+        let y := expr.instantiate_vars y ctxt,
+        T ← tactic.to_expr (expr.pi n bi (to_pexpr y) $ pexpr.mk_placeholder),
+        tactic.change T,
+        a ← tactic.intro n,
+        mutate (a::ctxt) rest
+    |ctxt ((Assigned n y a)::rest) := do
+        let y := expr.instantiate_vars y ctxt,
+        let a := expr.instantiate_vars a ctxt,
+        h ← tactic.definev n y a,
+        mutate (h::ctxt) rest
+    |ctxt ((Meta n y) :: rest) := do
+        let y := expr.instantiate_vars y ctxt,
+        h ← tactic.assert n y, -- [TODO] infer instances automatically.
+        tactic.apply_instance <|> tactic.swap,
+        h ← tactic.instantiate_mvars h,
+        mutate (h::ctxt) rest
+    /-- Take the given context, and produce a tactic_state whose target is `?m`  -/
+    meta def introduce_context (ctxt : list src) : tactic (expr × list expr) := do
+        result ← tactic.mk_mvar,
+        targ ← tactic.to_expr (pexpr_pis_of_ctxt ctxt $ pexpr.mk_placeholder) tt ff,
+        res ← tactic.mk_meta_var targ,
+        tactic.set_goals [res],
+        es ← mutate [] $ ctxt.reverse ,
+        pure (res, es)
+    -- meta def revert_aux : list expr → expr → list src → tactic (expr × list src)
+    -- |[] e acc := pure (e,acc)
+    -- |((expr.local_const _ pn bi y)::rest) e acc := do
+    --     let s := src.Hyp pn bi (expr.abstr)
+    -- meta def revert_context : list expr → expr → tactic (expr × list src)
+    -- |[] e := 
+        
 end src
 
 /-- 
@@ -51,6 +99,13 @@ meta inductive down_result
 |  pi (var_name : name) (bi : binder_info) (var_type : zipper) (body : zipper) : down_result
 |elet (var_name : name) (type : zipper) (assignment : zipper) (body : zipper) : down_result
 
+meta def down_result.children : down_result → list zipper
+|(down_result.terminal) := []
+|(down_result.app l r) := [l,r]
+|(down_result.lam n bi vt b) := [vt,b]
+|(down_result.pi n bi vt b) := [vt,b]
+|(down_result.elet n t a b) := [t,a,b]
+
 namespace zipper
     open path
     /--Move the cursor down the expression tree.-/
@@ -64,6 +119,7 @@ namespace zipper
             ⟨elet_assignment n t () b :: p, ctxt, a⟩ 
             ⟨elet_body n t a () :: p, (src.Assigned n t a)::ctxt, b⟩ 
     |⟨p,ctxt,e⟩ := down_result.terminal
+    meta def children : zipper → list zipper := down_result.children ∘ down
     /--Pop the cursor up the expression tree. If we are already at the top, returns `none`. [NOTE] This can throw if the zipper was not formed properly.-/
     meta def up : zipper → option zipper
     |⟨[],                            ctxt,    e⟩ := none
@@ -95,7 +151,12 @@ namespace zipper
         |_ := none
         end
     meta def unzip : zipper → expr := λ z, option.rec_on (up z) (current z) (unzip)
+    meta def unzip_with_ctxt : zipper → expr × list src := λ z, option.rec_on (up z) (current z, ctxt z) unzip_with_ctxt
     meta def zip : expr → zipper := λ e, zipper.mk [] [] e
+    meta def zip_with_ctxt : list src → expr → zipper
+    |ctxt current := {path := [], ctxt:= ctxt, current := current}
+    meta def zip_with_metas : telescope → expr → zipper := zip_with_ctxt ∘ src.mvars_of_telescope
+    meta def zip_with_hyps := zip_with_ctxt ∘ src.hyps_of_telescope
     meta def set_current : expr → zipper → zipper
     |e ⟨p,c,_⟩ := ⟨p,c,e⟩
     meta def map : (expr → expr) → zipper → zipper
@@ -116,18 +177,15 @@ namespace zipper
             pure y
     /-- `with_tactic t z` will replace `z.current` with a goal and then pass that goal to the given tactic. 
     If the tactic succeeds, then the result is replaced with z.current and unzipped. -/
-    meta def with_tactic : tactic unit → zipper → tactic expr := λ t z, do
-        Y ← infer_type z,
-        let T := src.pis_of_ctxt z.ctxt Y,
-        res ← tactic.fabricate (some T) (do
-            list.mfoldr (λ s _, do
-                lc ← tactic.intro (src.name s),
-                pure ()
-            ) () z.ctxt,
-            t
-        ),
-        abstracted ← z.ctxt.mfoldr (λ s res, expr.binding_body_all res) res,
-        pure $ z.unzip_with abstracted
+    -- meta def with_tactic : tactic unit → zipper → tactic expr := λ t z, do
+    --     gs ← tactic.get_goals,
+    --     ⟨e,hs⟩ ← src.introduce_context $ z.ctxt,
+    --     let current := expr.instantiate_vars z.current hs,
+    --     Y ← tactic.infer_type current,
+    --     tactic.change Y,
+    --     t,
+    --     e ← tactic.instantiate_mvars e,
+    --     pure e
 
     --meta def unzip_lambda : name → zipper → expr := λ n e z, expr.lam n binder_info.default _ $ unzip $ z.set_current (expr.var z.depth)
     meta instance : has_to_tactic_format zipper := ⟨λ z, do
@@ -155,7 +213,6 @@ namespace zipper
             pure ()
         ) 
     meta def unzip_free : zipper → expr := λ z, z.unzip_with $ expr.var z.depth
-    #check @eq.rec
     /-- `apply_congr (rhs,pf) z` takes the given `%%pf : %%z.current = %%rhs` and makes a congruence lemma using the given zipper.  -/
     meta def apply_congr : (expr × expr) → zipper → tactic (expr × expr) := λ ⟨rhs,pf⟩ z, do
         let lhs := z.current,
@@ -189,7 +246,6 @@ namespace zipper
         refine ```(@eq.rec %%T %%lhs (λ X, %%lhs' = z.unzip_with $ expr.var 0) rfl %%rhs _),
         cnv
 
-
     private meta def is_proper (p : param_info) : bool := ¬(param_info.is_implicit p || param_info.is_inst_implicit  p || param_info.is_prop p)
 
     /-- Take a zipper where the current expression is a function application, and return zippers over all of the non-implicit, non-prop arguments.-/
@@ -197,7 +253,7 @@ namespace zipper
         let c := z.current,
         let f := expr.get_app_fn c,
         let args := expr.get_app_args c,
-        ⟨params,result_deps⟩ ← tactic.get_fun_info f (args.length),
+        params ← (fun_info.params <$> tactic.get_fun_info f (args.length)) <|> pure [],
         let params := list.reverse params,
         ⟨zippers, _⟩ ← params.mfoldl (λ acc p, do
             let (⟨zippers,z⟩ : (list zipper) × zipper) := acc,
@@ -207,6 +263,31 @@ namespace zipper
                 pure (zr::zippers,z')
             else pure (zippers, z')) (([] : list zipper), z),
         pure (f,zippers)
+
+    meta def traverse {α} (f : α → zipper → tactic α) : α → zipper → tactic α
+    | a z := do a ← f a z, z.children.mfoldl traverse a
+
+    meta def traverse_proper {α} (f : α →  zipper → tactic α) : α → zipper → tactic α
+    |a z := do
+        a ← f a z,
+        zpp ← pp z,
+        --trace $ ("traverse " : format) ++ zpp,
+        (_,children) ← down_proper z,
+        children.mfoldl traverse_proper a
+
+    -- /-- `match_current e z` tries to match `e` with `z.current` in `z`'s context. 
+    --     Recall that _matching_ is distinct from _unifying_ in that only metavariables in `z.current` may be assigned from this process.
+    --     So if `z.ctxt` has metavariables, these can be assigned. -/
+    -- meta def match_current : expr → zipper → tactic zipper | e z := do
+    --     -- [HACK] for now, assume that the zipper's context is composed entirely of metas.
+    --     T ← tactic.infer_type e,
+    --     current ← tactic.to_expr $ src.pexpr_pis_of_ctxt z.ctxt (to_pexpr z.current),
+    --     tactic.unify e current,
+
+    --     let c := z.current,
+    --     let t := z.ctxt.reverse,
+        
+    --     notimpl
 
 end zipper
 
