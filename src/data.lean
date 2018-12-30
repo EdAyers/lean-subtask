@@ -119,6 +119,7 @@ meta def task.test : task → M bool
 |_ := notimpl
 meta def strategy.of_rule : rule → M strategy := λ r, pure $ strategy.Use $ r
 
+/-- Do In One Move. Check the lookahead table and see if any of the entries in there cause the task to be achieved. -/
 meta def task.diom : task → M (list strategy) := λ t, do
     ce ← get_ce,
     lookahead ← get_lookahead,
@@ -136,15 +137,15 @@ meta def task.diom : task → M (list strategy) := λ t, do
         end
     ) lookahead,
     winners.mmap (strategy.of_rule)
+open ez
 
-meta def task.refine : task → M refinement
+meta def try_dioms : task → M refinement | t := do dioms ← task.diom t, if ¬ dioms.empty then pure ([],dioms) else failure
+
+meta def task.refine (t : task) : M refinement :=
+try_dioms t <|>
+match t with
 |(task.Create e) := do
     ce ← get_ce,
-    -- if we can create in one move, do it.
-    -- A. If we can create ce in one move, expose those
-    dioms ← task.diom (task.Create e),
-    if ¬ dioms.empty then pure ([], dioms) else do
-    -- B. Look for rules which will create the given term.
     rt ← get_rule_table,
     submatches ← rt.submatch e,
     strats ← list.mmap strategy.of_rule $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
@@ -154,12 +155,22 @@ meta def task.refine : task → M refinement
     -- I think the only way is going to be to traverse a rule when it is added and it to a dictionary "symbol ⇀ rule × zipper". 
 |(task.CreateAll a) := do
     ce ← get_ce,
-    scs ← smallest_uncommon_subterms ce a,
-    notimpl
+    scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
+    if scs.length = 0 then notimpl else do
+    let scs := task.Create <$> zipper.current <$> scs,
+    pure $ (scs, [])
+end
 
+meta def strategy.execute : strategy → conv unit
+|(strategy.ReduceDistance a b) := notimpl
+|(strategy.Use r)              := rule.to_conv r
 
-meta def strategy.execute : strategy → conv unit := notimpl
-meta def strategy.refine : strategy → M refinement := notimpl
+meta def strategy.refine : strategy → M refinement
+|(strategy.ReduceDistance a b) := notimpl
+|(strategy.Use r)              :=
+    -- 1. expand lhs with metas.
+    -- 2. run lowest_uncommon_subterms ce lhs.
+    notimpl	
 meta def stack.append_subtasks : list task → stack → list (task × stack) 
 |tasks stack := tasks.map_with_rest (λ c rest, (c,(stack_entry.task c rest []) :: stack)) 
 meta def stack.append_substrats : list strategy → stack → list (strategy × stack)
@@ -196,7 +207,10 @@ meta def execute_strategy : strategy → stack → M unit
     state_t.lift $ strategy.execute s,
     ce' ← get_ce,
     when (ce = ce') (tactic.fail "strategy did not change the goal."),
-    stack.mfold_achieved (λ _ acheived, do r ← acheived.test, when (r) (tactic.fail "stategy caused a previously achieved task to fail.") ) (),
+    stack.mfold_achieved (λ _ acheived, do 
+        r ← acheived.test, 
+        when (r) (tactic.fail "stategy caused a previously achieved task to fail.")
+    ) (),
     lookahead ← rule_table.rewrites ce' state.config.rule_table,
     let visited := state.visited.insert ce,
     put {

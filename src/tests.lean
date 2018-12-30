@@ -62,8 +62,8 @@ namespace tests
             do rs ← rules
             ,  let e := `(G_theory.a * 1)
             ,  subs ← rule_table.submatch e rs
-            ,  test.equal subs.length 3
             ,  trace subs
+            ,  test.equal subs.length 3
 
         )
         -- test head-match and rewrites.
@@ -117,13 +117,12 @@ namespace tests
         open ez.zipper
         run_cmd do
           to_expr ```(Π (A : V → V) (u x y : V),_) >>= assert `h,
+          swap, triv,
           [A,u,x,y] ← intros,
           lhs ← to_expr ```(⟪%%A†(%%x + %%y),%%u⟫),
           rhs ← to_expr ```(⟪%%A† %%x + %%A† %%y, %%u⟫),
-        --   zs ← ez.zipper.lowest_uncommon_subterms lhs (ez.zipper.zip rhs),
           zs ← lowest_uncommon_subterms lhs (zip rhs),
-          zs ← pure zs,
-          trace zs,
+          test.equal zs.length 2,
           skip
     end vector_theory
 

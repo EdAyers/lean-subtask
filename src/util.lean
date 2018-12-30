@@ -55,6 +55,8 @@ meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
 |_ := ff
 
+
+
 def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []
 |(h::t) := pure (λ fh rest, option.cases_on fh rest (λ fh,fh::rest)) 
@@ -86,6 +88,16 @@ namespace writer_t
         instance : has_monad_lift m (writer_t σ m) := ⟨λ α, writer_t.lift⟩
 end writer_t
 
+section
+    variables {T : Type u → Type u} [monad T] {α β γ : Type u} (p : α → T (β ⊕ γ))
+    def list.mpartition : list α → T (list β × list γ):= λ l, do 
+        ⟨xs,ys⟩ ← l.mfoldl (λ (xsys : list β × list γ) a, do 
+            ⟨xs,ys⟩ ← pure xsys,
+            r ← p a, 
+            pure $ sum.rec_on r (λ x, ⟨x::xs,ys⟩) (λ y, ⟨xs,y::ys⟩)
+        ) (⟨[],[]⟩), 
+        pure ⟨xs.reverse,ys.reverse⟩
+end
 
 namespace test
     meta def assert (test : bool) (msg : option string := none) : tactic unit := when (¬test) $ fail $ option.get_or_else msg "Assertion failed"

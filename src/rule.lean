@@ -82,7 +82,6 @@ namespace rule
     |(⟨⟨n,b,y⟩, some E⟩::rest) e := specify_aux₂ rest $ expr.instantiate_var e E
     |(⟨⟨n,b,y⟩, none⟩ :: rest) e := specify_aux₂ rest $ expr.lam n b y e
 
-
     meta def specify : list (option expr) → rule → tactic rule | vals r := do
         when (r.ctxt.length ≠ vals.length) (fail "context assignment list is a different length to the rule's context. "),
         let rctxt := list.zip r.ctxt vals,
@@ -90,5 +89,11 @@ namespace rule
         let pf := specify_aux₂ rctxt pf, 
         infer_type pf, -- make sure it's valid
         of_prf pf
+
+    meta def to_conv (r : rule) : conv unit := do
+        apply r.pf,
+        try $ all_goals $ apply_instance <|> assumption,
+        pure ()
+
 
 end rule

@@ -6,32 +6,49 @@ namespace robot
 @[derive decidable_eq]
 meta structure submatch :=
 (r : rule) -- the original rule
-(z : zipper) -- a zipper on `r.rhs`, includes extra context for each arg in `r`'s telescope.
+(z : zipper) -- a zipper on `r.rhs`
 
 namespace submatch
     open tactic
-    private meta def intro_ctxt : list expr → list src → tactic (list expr)
-    |acc ((src.Meta n y)::rest) := do 
+    meta def intro_metas : list expr → list hyp → tactic (list expr)
+    |acc (⟨n,b,y⟩::rest) := do 
         let y := expr.instantiate_vars y acc,
         mv ← tactic.mk_meta_var y,
-        get_goals >>= (set_goals ∘ ((::) mv)),
-        apply_instance <|> swap,
-        intro_ctxt (mv::acc) rest
+        intro_metas (mv::acc) rest
     |acc [] := pure acc
-    |acc _ := notimpl
-    meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := (λ x:tactic _, bind x returnopt) $ hypothetically $ do 
-        e_type ← infer_type e,
-        hs ← intro_ctxt [] $ z.ctxt.reverse,
-        set_goals hs,
-        let current := expr.instantiate_vars z.current hs,
-        current_type ← infer_type current,
-        unify current_type e_type,
-        all_goals $ try $ apply_instance,
-        current ← instantiate_mvars current,
+    /--`run e s` attempts to unify `e` with the subterm of `s` and then returns a rule depending on fresh metavariables.-/
+    -- meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do -- [TODO] return a `submatch_result` which also scores the match.
+    --     gs ← get_goals,
+    --     e_type ← infer_type e,
+    --     ms ← intro_metas [] $ r.ctxt.reverse,
+    --     set_goals ms,
+    --     let current := expr.instantiate_vars z.current ms,
+    --     current_type ← infer_type current,
+    --     unify current_type e_type,
+    --     all_goals $ try $ apply_instance,
+    --     current ← instantiate_mvars current,
+    --     unify e current,
+    --     --ctxt : list $ hyp × expr × option expr ← list.zip r.ctxt <$> list.mmap (λ h, (some <$> get_assignment h) <|> pure none) ms,
+    --     ms ← ms.mmap instantiate_mvars,
+    --     set_goals gs,
+    --     rule.of_prf $ expr.mk_app r.pf ms.reverse
+    meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do
+        trace $ "\n",
+        gs ← get_goals,
+        res ← mk_mvar,
+        set_goals [res],
+        infer_type r.pf >>= trace,
+        ms ← trace_fail $ apply_core r.pf {instances := ff},
+        res ← instantiate_mvars res,
+        infer_type res >>= trace,
+        if ¬z.ctxt.empty then notimpl else do
+        let current := expr.instantiate_vars z.current $ ms.reverse.map prod.snd,
         unify e current,
-        get_goals >>= set_goals,
-        hs ← hs.mmap (λ h,  (some <$> get_assignment h) <|> pure none), -- [FIXME] breaks when assignments depend themselves on other hs.
-        rule.specify hs r
+        -- trace_state,
+        set_goals gs,
+        rule.of_prf res
+
+
         
     meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
 end submatch
@@ -53,7 +70,7 @@ namespace rule_table
     meta def insert : rule → rule_table → tactic rule_table
     | r {head_table:=ht, submatch_table := st} := do
         ppr ← pp r,
-        st ← zipper.traverse_proper (λ st z, pure $ listdict.insert (get_key z.current) (submatch.mk r z) st) st $ zipper.zip_with_metas r.ctxt r.rhs,
+        st ← zipper.traverse_proper (λ st z, pure $ listdict.insert (get_key z.current) (submatch.mk r z) st) st $ zipper.zip r.rhs,
         pure { head_table := tabledict.insert (get_key r.lhs) r ht
              , submatch_table :=  st
              }

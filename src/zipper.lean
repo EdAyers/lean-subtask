@@ -19,20 +19,20 @@ meta inductive path
 meta inductive src
 |Hyp      (n : name) (bi : binder_info) (type : expr)  : src
 |Assigned (n : name) (type : expr) (assignment : expr) : src
-|Meta     (n : name) (type : expr)                     : src
+-- |Meta     (n : name) (type : expr)                     : src
 namespace src
     meta def type : src → expr
     |(Hyp _ _ t) := t
     |(Assigned _ t _) := t
-    |(Meta _ t) := t
+    -- |(Meta _ t) := t
     meta def name : src → name
     |(Hyp n _ _) := n
     |(Assigned n _ _) := n
-    |(Meta n _) := n
+    -- |(Meta n _) := n
     meta def to_local : src → tactic expr
     |(Hyp n bi t) := tactic.mk_local' n bi t
     |(Assigned n t _) := tactic.mk_local' n binder_info.default t
-    |(Meta n t) := tactic.mk_meta_var t
+    -- |(Meta n t) := tactic.mk_meta_var t
     -- meta def pis_of_ctxt : list src → expr → expr
     -- |[] e := e
     -- |((src.Hyp n bi y) :: t) e := pis_of_ctxt t $ expr.pi n bi y $ e
@@ -42,9 +42,9 @@ namespace src
     |[] e := to_pexpr e
     |((src.Hyp n bi y) :: rest) e := pexpr_pis_of_ctxt rest $ @expr.pi ff n bi (to_pexpr y) $ e
     |((src.Assigned n y a) :: rest) e := pexpr_pis_of_ctxt rest $ expr.elet n (to_pexpr y) (to_pexpr a) $ e
-    |((src.Meta n y) :: rest) e := pexpr_pis_of_ctxt rest $ expr.app (expr.lam n binder_info.default (to_pexpr y) e) pexpr.mk_placeholder
+    -- |((src.Meta n y) :: rest) e := pexpr_pis_of_ctxt rest $ expr.app (expr.lam n binder_info.default (to_pexpr y) e) pexpr.mk_placeholder
     meta def hyps_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Hyp n bi y)
-    meta def mvars_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Meta n y)
+    -- meta def mvars_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Meta n y)
     
     /--Aux fn for `introduce_context`.-/
     private meta def mutate : list expr → list src → tactic (list expr)
@@ -60,29 +60,32 @@ namespace src
         let a := expr.instantiate_vars a ctxt,
         h ← tactic.definev n y a,
         mutate (h::ctxt) rest
-    |ctxt ((Meta n y) :: rest) := do
-        let y := expr.instantiate_vars y ctxt,
-        m ← tactic.mk_meta_var y,
-        gs ← tactic.get_goals,
-        tactic.set_goals $ m :: gs,
-        tactic.apply_instance <|> tactic.swap,
-        m ← tactic.instantiate_mvars m,
-        mutate (m::ctxt) rest
-    /-- Take the given context and make a new tactic state.
-        - each `Hyp` becomes a local constant, 
-        - each `Assigned` becomes an assigned local constant 
-        - each `Meta` becomes an mvar ([TODO] should it be a goal?)
-        Returns `(r,hs)` where:
-        - `r` is the result term for acheiving the given goal.
-        - `hs` are local-consts or mvars for each element of `ctxt`.
-        The goal of the returned tactic is to be determined.
-          -/
-    meta def introduce_context (ctxt : list src) : tactic (expr × list expr) := do
-        targ ← tactic.to_expr (pexpr_pis_of_ctxt ctxt $ pexpr.mk_placeholder) tt ff,
-        res ← tactic.mk_meta_var targ,
-        tactic.set_goals [res],
-        es ← mutate [] $ ctxt.reverse ,
-        pure (res, es)
+    -- |ctxt ((Meta n y) :: rest) := do
+    --     let y := expr.instantiate_vars y ctxt,
+    --     m ← tactic.mk_meta_var y,
+    --     gs ← tactic.get_goals,
+    --     tactic.set_goals $ m :: gs,
+    --     tactic.apply_instance <|> tactic.swap,
+    --     m ← tactic.instantiate_mvars m,
+    --     mutate (m::ctxt) rest
+    -- /-- Take the given context and make a new tactic state.
+    --     - each `Hyp` becomes a local constant, 
+    --     - each `Assigned` becomes an assigned local constant 
+    --     - each `Meta` becomes an mvar ([TODO] should it be a goal?)
+    --     Returns `(r,hs)` where:
+    --     - `r` is the result term for acheiving the given goal.
+    --     - `hs` are local-consts or mvars for each element of `ctxt`.
+    --     The goal of the returned tactic is to be determined.
+    --       -/
+    -- meta def introduce_context (ctxt : list src) : tactic (expr × list expr) := do
+    --     targ ← tactic.to_expr (pexpr_pis_of_ctxt ctxt $ pexpr.mk_placeholder) tt ff,
+    --     res ← tactic.mk_meta_var targ,
+    --     tactic.set_goals [res],
+    --     es ← mutate [] $ ctxt.reverse ,
+    --     pure (res, es)
+    open tactic
+
+
     -- meta def revert_aux : list expr → expr → list src → tactic (expr × list src)
     -- |[] e acc := pure (e,acc)
     -- |((expr.local_const _ pn bi y)::rest) e acc := do
@@ -168,7 +171,7 @@ namespace zipper
     meta def zip : expr → zipper := λ e, zipper.mk [] [] e
     meta def zip_with_ctxt : list src → expr → zipper
     |ctxt current := {path := [], ctxt:= ctxt, current := current}
-    meta def zip_with_metas : telescope → expr → zipper := zip_with_ctxt ∘ src.mvars_of_telescope
+    -- meta def zip_with_metas : telescope → expr → zipper := zip_with_ctxt ∘ src.mvars_of_telescope
     meta def zip_with_hyps := zip_with_ctxt ∘ src.hyps_of_telescope
     meta def set_current : expr → zipper → zipper
     |e ⟨p,c,_⟩ := ⟨p,c,e⟩
@@ -245,6 +248,7 @@ namespace zipper
             refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf)
         ),
         pure (rhs',pf')
+    
     meta def apply_rule : rule → zipper → tactic rule := λ r z, do
         r ← r.head_rewrite z.current,
         (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
@@ -309,12 +313,28 @@ namespace zipper
             kids ← list.join <$> list.mmap maximal_monotone children,
             pure $ kids
 
-    meta def lowest_uncommon_subterms : expr → zipper → tactic (list _)
-    |e z := minimal_monotone (λ z, 
+    /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
+    meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
+        minimal_monotone (λ z, 
         if z.is_mvar || z.is_constant then failure else
-        if expr.occurs z.current e then failure else pure z) z
+        -- [TODO] this should instead be l.zip.maximal_monotone (λ lz, z ⊎ lz)
+        -- I think that I'm going to have to stop worrying about creating tonnes of metavariables.
+        if expr.occurs z.current l then failure else pure z) z
 
 
+    -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
+    --     hypothetically (do
+    --         l_ctxt ← src.intro_ctxt [] $ l.ctxt.reverse,
+    --         r_ctxt ← src.intro_ctxt [] $ r.ctxt.reverse,
+    --         lc ← pure $ expr.instantiate_vars l.current l_ctxt,
+    --         rc ← pure $ expr.instantiate_vars r.current r_ctxt,
+    --         tactic.unify lc rc,
+    --         -- now some of the metavariables in l_ctxt and r_ctxt will be assigned.
+    --         -- also note that these assignments can depend on other non-assigned metavariables.
+    --         -- [FIXME] for now, we ignore this case and assume that the metas are never assigned wrt other metas.
+
+    --         expr.a
+    --     )
 
     -- /-- `match_current e z` tries to match `e` with `z.current` in `z`'s context. 
     --     Recall that _matching_ is distinct from _unifying_ in that only metavariables in `z.current` may be assigned from this process.
