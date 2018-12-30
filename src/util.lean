@@ -1,6 +1,7 @@
 open tactic
 
 universes u v
+section
 variables {α : Type u} {β : Type v}
 
 meta def notimpl : α := undefined_core "not implemented"
@@ -24,6 +25,15 @@ meta def tactic.fabricate (type : option expr) (strat : tactic unit) : tactic ex
 meta def tactic.ignore : tactic unit := do
     g::gs ← get_goals | pure (),
     set_goals gs
+
+meta def tactic.trace_fail {α} (t : tactic α) : (tactic α) | s :=
+    match t s with
+    |(interaction_monad.result.exception msg pos _) :=
+        let tr : tactic unit := tactic.trace $ ("Exception: ":format) ++ (option.rec_on msg (to_fmt "silent") (λ f, f())) in
+        (tr >> t) s
+    |r := r
+    end
+
 
 open interaction_monad.result
 
@@ -56,3 +66,33 @@ private def map_with_rest_aux (m : α → list α → β) : list α → list α 
 | left (a::right) acc := map_with_rest_aux (a::left) right (m a (left.foldl (λ l x, x :: l) right) :: acc)
 
 def list.map_with_rest (m : α → list α → β) : list α → list β := λ right, map_with_rest_aux m [] right []
+end
+structure writer_t (σ : Type u) (m : Type u → Type v) (α : Type u) : Type (max u v) :=
+(run : m (α × σ))
+attribute [pp_using_anonymous_constructor] writer_t
+namespace writer_t
+        variables {σ : Type u} [monoid σ] {m : Type u → Type v} [monad m] 
+        variables {α β : Type u}
+        @[inline] protected def pure (a : α) : writer_t σ m α := ⟨pure ⟨a,1⟩⟩
+        @[inline] protected def bind (x : writer_t σ m α) (f : α → writer_t σ m β) : writer_t σ m β := 
+        ⟨do ⟨a,s₁⟩ ← x.run, ⟨b,s₂⟩ ← (f a).run, pure ⟨b, s₁ * s₂⟩ ⟩
+        instance : monad (writer_t σ m) := {pure:=λ α, writer_t.pure, bind := λ α β, writer_t.bind}
+        protected def orelse [alternative m] {α : Type u} (x₁ x₂ : writer_t σ m α) : writer_t σ m α :=
+        ⟨run x₁ <|> run x₂⟩
+        protected def failure [alternative m] : writer_t σ m α := ⟨failure⟩
+        instance [alternative m] : alternative (writer_t σ m) := {failure := λ α, writer_t.failure, orelse := λ α, writer_t.orelse}
+        def log (msg : σ) : writer_t σ m punit := ⟨pure ⟨⟨⟩,msg⟩⟩
+        @[inline] protected def lift (t : m α) : writer_t σ m α := ⟨(λ a, ⟨a,1⟩) <$> t⟩
+        instance : has_monad_lift m (writer_t σ m) := ⟨λ α, writer_t.lift⟩
+end writer_t
+
+
+namespace test
+    meta def assert (test : bool) (msg : option string := none) : tactic unit := when (¬test) $ fail $ option.get_or_else msg "Assertion failed"
+    meta def equal {α} [decidable_eq α] [has_to_tactic_format α] (expected actual : α) (msg : format := "") : tactic unit := when (expected ≠ actual) $ do
+        epp ← pp expected,
+        app ← pp actual,
+        fail $ (to_fmt "Assertion failed: \nexpected: ") ++ format.nest 10 epp ++ "\n  actual: " ++ format.nest 10 app ++ "\n" ++ msg
+    -- [TODO] `meta def snapshot` would be the dream. You could do this by dumping the to_tactic_format code to a text file and then reading it back using io. I guess you would also need a monad called test.
+end test
+

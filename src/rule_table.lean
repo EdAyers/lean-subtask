@@ -1,31 +1,44 @@
+
 import .table .rule .zipper
 open tactic ez
 namespace robot
-#check simp_lemmas
 
+@[derive decidable_eq]
 meta structure submatch :=
 (r : rule) -- the original rule
-(z : zipper) -- a zipper on `r.rhs` 
+(z : zipper) -- a zipper on `r.rhs`, includes extra context for each arg in `r`'s telescope.
 
 namespace submatch
-    meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do
-        ⟨result,hs⟩ ← src.introduce_context z.ctxt,
+    open tactic
+    private meta def intro_ctxt : list expr → list src → tactic (list expr)
+    |acc ((src.Meta n y)::rest) := do 
+        let y := expr.instantiate_vars y acc,
+        mv ← tactic.mk_meta_var y,
+        get_goals >>= (set_goals ∘ ((::) mv)),
+        apply_instance <|> swap,
+        intro_ctxt (mv::acc) rest
+    |acc [] := pure acc
+    |acc _ := notimpl
+    meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := (λ x:tactic _, bind x returnopt) $ hypothetically $ do 
+        e_type ← infer_type e,
+        hs ← intro_ctxt [] $ z.ctxt.reverse,
+        set_goals hs,
         let current := expr.instantiate_vars z.current hs,
-        refine ```(%%e = %%current),
-        n ← num_goals,
-        when (n≠0) (fail "not all metavariables were accounted for."),
-        set_goals [result],
-        tactic.reflexivity,
-        result ← instantiate_mvars result,
-        r₁ ← rule.of_prf result,
-        zipper.apply_rule r₁ z
+        current_type ← infer_type current,
+        unify current_type e_type,
+        all_goals $ try $ apply_instance,
+        current ← instantiate_mvars current,
+        unify e current,
+        get_goals >>= set_goals,
+        hs ← hs.mmap (λ h,  (some <$> get_assignment h) <|> pure none), -- [FIXME] breaks when assignments depend themselves on other hs.
+        rule.specify hs r
         
+    meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
 end submatch
 
 meta structure rule_table := 
 (head_table : tabledict name rule)
 (submatch_table : listdict name submatch)
-
 
 namespace rule_table 
 
@@ -44,8 +57,13 @@ namespace rule_table
         pure { head_table := tabledict.insert (get_key r.lhs) r ht
              , submatch_table :=  st
              }
-    
+    meta def join (r₁ r₂ : rule_table) : tactic rule_table := tabledict.mfold (λ rt _ r, insert r rt) r₂ $ head_table $ r₁
     meta def of_rules : list rule → tactic rule_table := list.mfoldl (function.swap insert) empty
+
+    meta def of_names (ns : list name) : tactic rule_table := do
+        rs ← ns.mmap rule.of_name,
+        revs ← rs.mmap rule.flip,
+        of_rules $ rs ++ revs
     private meta def get_head_rewrites : name → rule_table → table rule | k {head_table := ht, ..} := ht.get k
     meta def head_rewrites : expr → rule_table → (tactic $ list rule) := λ lhs rt, do
         let k := get_key lhs,
@@ -53,11 +71,11 @@ namespace rule_table
         let t := get_head_rewrites `rule_table.wildcard rt ∪ get_head_rewrites k rt,
         tpp ← pp t,
         --trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
-        t.mfold (λ r acc, (do r ← rule.head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
+        t.mfold (λ acc r, (do r ← rule.head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
 
     private meta def rewrites_aux (rt : rule_table) : zipper → list rule → tactic (list rule)
     |z acc := do
-        -- trace z,
+        --trace z,
         head_rewrites ← rt.head_rewrites z.current,
         --trace head_rewrites,
         head_rewrites ← head_rewrites.mcollect (λ rw, ez.zipper.apply_rule rw z),
@@ -81,7 +99,7 @@ namespace rule_table
     meta def submatch : expr → rule_table → tactic (list rule) | e rt := do
         let k := get_key e, -- [TODO] need to guard against wildcards.
         let items := rt.submatch_table.get k,
-        rules ← items.mmap (robot.submatch.run e),
+        rules ← items.mcollect (robot.submatch.run e),
         pure rules
 
 end rule_table

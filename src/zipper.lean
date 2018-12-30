@@ -2,6 +2,7 @@
 import .util .rule
 namespace ez
 
+@[derive decidable_eq]
 meta inductive path
 |app_left        (left : unit) (right : expr) : path
 |app_right       (left : expr) (right : unit) : path
@@ -14,6 +15,7 @@ meta inductive path
 |elet_body       (var_name : name) (type : expr) (assignment : expr)    (body : unit) : path
 
 /-- A context entry. -/
+@[derive decidable_eq]
 meta inductive src
 |Hyp      (n : name) (bi : binder_info) (type : expr)  : src
 |Assigned (n : name) (type : expr) (assignment : expr) : src
@@ -60,13 +62,22 @@ namespace src
         mutate (h::ctxt) rest
     |ctxt ((Meta n y) :: rest) := do
         let y := expr.instantiate_vars y ctxt,
-        h ← tactic.assert n y, -- [TODO] infer instances automatically.
+        m ← tactic.mk_meta_var y,
+        gs ← tactic.get_goals,
+        tactic.set_goals $ m :: gs,
         tactic.apply_instance <|> tactic.swap,
-        h ← tactic.instantiate_mvars h,
-        mutate (h::ctxt) rest
-    /-- Take the given context, and produce a tactic_state whose target is `?m`  -/
+        m ← tactic.instantiate_mvars m,
+        mutate (m::ctxt) rest
+    /-- Take the given context and make a new tactic state.
+        - each `Hyp` becomes a local constant, 
+        - each `Assigned` becomes an assigned local constant 
+        - each `Meta` becomes an mvar ([TODO] should it be a goal?)
+        Returns `(r,hs)` where:
+        - `r` is the result term for acheiving the given goal.
+        - `hs` are local-consts or mvars for each element of `ctxt`.
+        The goal of the returned tactic is to be determined.
+          -/
     meta def introduce_context (ctxt : list src) : tactic (expr × list expr) := do
-        result ← tactic.mk_mvar,
         targ ← tactic.to_expr (pexpr_pis_of_ctxt ctxt $ pexpr.mk_placeholder) tt ff,
         res ← tactic.mk_meta_var targ,
         tactic.set_goals [res],
@@ -87,11 +98,13 @@ It does not replace bound variables with local constants, but instead maintains 
 
 Reference: [Functional Pearl - The Zipper](https://www.st.cs.uni-saarland.de/edu/seminare/2005/advanced-fp/docs/huet-zipper.pdf)
  -/
+@[derive decidable_eq]
 meta structure zipper :=
 (path : list path)
 (ctxt : list src)
 (current : expr)
 
+@[derive decidable_eq]
 meta inductive down_result
 |terminal : down_result
 |app (left : zipper) (right : zipper) : down_result
@@ -166,6 +179,11 @@ namespace zipper
     /--The number of binders above the cursor. -/
     meta def depth : zipper → ℕ := list.length ∘ zipper.ctxt
     meta def unzip_with : expr → zipper → expr := λ e z, unzip $ z.set_current e
+    meta def is_var : zipper → bool := expr.is_var ∘ current
+    meta def is_constant : zipper → bool := expr.is_constant ∘ current
+    meta def is_local_constant : zipper → bool := expr.is_local_constant ∘ current
+    meta def is_mvar : zipper → bool := expr.is_mvar ∘ current
+    meta def is_terminal : zipper → bool := λ z, z.down = down_result.terminal
     /--Infer the type of the subexpression at the cursor position. -/
     meta def infer_type : zipper → tactic expr := λ z, do
             ⟨ins,lcs⟩ ← list.mfoldl (λ ct s, do
@@ -267,13 +285,36 @@ namespace zipper
     meta def traverse {α} (f : α → zipper → tactic α) : α → zipper → tactic α
     | a z := do a ← f a z, z.children.mfoldl traverse a
 
+    /--Traverse all of zipper.current. If `f` fails, then that branch is skipped.-/
     meta def traverse_proper {α} (f : α →  zipper → tactic α) : α → zipper → tactic α
-    |a z := do
+    |a z := (do
         a ← f a z,
         zpp ← pp z,
         --trace $ ("traverse " : format) ++ zpp,
         (_,children) ← down_proper z,
-        children.mfoldl traverse_proper a
+        children.mfoldl traverse_proper a)
+        <|> pure a
+
+    meta def minimal_monotone {α} (p : zipper → tactic α) : zipper → tactic (list α)
+    |z := (do
+        a ← p z,
+        (_,children) ← down_proper z,
+        kids ← list.join <$> list.mmap minimal_monotone children,
+        pure $ list.cases_on kids [a] (λ _ _,kids))
+        <|>  pure []
+
+    meta def maximal_monotone {α} (p : zipper → tactic α) : zipper → tactic (list α)
+    |z := (do a ← p z, pure [a]) <|> do
+            (_,children) ← down_proper z,
+            kids ← list.join <$> list.mmap maximal_monotone children,
+            pure $ kids
+
+    meta def lowest_uncommon_subterms : expr → zipper → tactic (list _)
+    |e z := minimal_monotone (λ z, 
+        if z.is_mvar || z.is_constant then failure else
+        if expr.occurs z.current e then failure else pure z) z
+
+
 
     -- /-- `match_current e z` tries to match `e` with `z.current` in `z`'s context. 
     --     Recall that _matching_ is distinct from _unifying_ in that only metavariables in `z.current` may be assigned from this process.
@@ -290,6 +331,5 @@ namespace zipper
     --     notimpl
 
 end zipper
-
 
 end ez

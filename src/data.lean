@@ -1,5 +1,5 @@
 
-import .table .graph .rule .rule_table
+import .table .rule .rule_table
 namespace robot
 section equiv
     universes u
@@ -36,30 +36,30 @@ meta def strategy.lt : strategy → strategy → bool
 meta instance strategy.has_lt : has_lt strategy := ⟨λ x y, strategy.lt x y⟩
 meta instance strategy.decidable_lt : decidable_rel ((<) : strategy → strategy → Prop) := by apply_instance
 
-meta inductive V
-|Task : task → V
-|Strategy : strategy → V
-meta def V.code : V → ℕ
-|(V.Task _) := 0
-|(V.Strategy _) := 1
-meta def V.lt : V → V → bool
-|(V.Task t₁) (V.Task t₂) := t₁ < t₂
-|(V.Strategy s₁) (V.Strategy s₂) := s₁ < s₂
-|x y := V.code x < V.code y
-meta instance V.has_lt : has_lt V := ⟨λ x y, V.lt x y⟩
-meta structure E := 
-(strategies : list strategy)
-(tasks : list task)
-meta def E.lt : E → E → bool
-|⟨s₁,t₁⟩ ⟨s₂,t₂⟩ := (s₁ < s₂) || (¬(s₁ > s₂) && (t₁ < t₂))
-meta instance E.has_lt : has_lt E := ⟨λ x y, E.lt x y⟩
-meta def E.children : E → list V
-|⟨ss,ts⟩ := (V.Task <$> ts) ++ (V.Strategy <$> ss)
-meta def E.filter (p : V → bool) : E → E
-|⟨ss,ts⟩ := ⟨ss.filter (λ s, p $ V.Strategy $ s), ts.filter (λ t, p $ V.Task $ t)⟩
-meta instance : edge_col V E := ⟨E.children, E.filter⟩
-meta def G := digraph V E
-meta instance : has_mem V G := digraph.has_mem
+-- meta inductive V
+-- |Task : task → V
+-- |Strategy : strategy → V
+-- meta def V.code : V → ℕ
+-- |(V.Task _) := 0
+-- |(V.Strategy _) := 1
+-- meta def V.lt : V → V → bool
+-- |(V.Task t₁) (V.Task t₂) := t₁ < t₂
+-- |(V.Strategy s₁) (V.Strategy s₂) := s₁ < s₂
+-- |x y := V.code x < V.code y
+-- meta instance V.has_lt : has_lt V := ⟨λ x y, V.lt x y⟩
+-- meta structure E := 
+-- (strategies : list strategy)
+-- (tasks : list task)
+-- meta def E.lt : E → E → bool
+-- |⟨s₁,t₁⟩ ⟨s₂,t₂⟩ := (s₁ < s₂) || (¬(s₁ > s₂) && (t₁ < t₂))
+-- meta instance E.has_lt : has_lt E := ⟨λ x y, E.lt x y⟩
+-- meta def E.children : E → list V
+-- |⟨ss,ts⟩ := (V.Task <$> ts) ++ (V.Strategy <$> ss)
+-- meta def E.filter (p : V → bool) : E → E
+-- |⟨ss,ts⟩ := ⟨ss.filter (λ s, p $ V.Strategy $ s), ts.filter (λ t, p $ V.Task $ t)⟩
+-- meta instance : edge_col V E := ⟨E.children, E.filter⟩
+-- meta def G := digraph V E
+-- meta instance : has_mem V G := digraph.has_mem
 
 meta structure config := 
 (rule_table     : rule_table)
@@ -152,7 +152,11 @@ meta def task.refine : task → M refinement
     -- [TODO] take each rule in rt, find an application of the rule that will cause a subterm of the rhs to be `e`
     -- [TODO] is there a way of doing this that doesn't require one to search through every single rule?
     -- I think the only way is going to be to traverse a rule when it is added and it to a dictionary "symbol ⇀ rule × zipper". 
-|(task.CreateAll a) := notimpl
+|(task.CreateAll a) := do
+    ce ← get_ce,
+    scs ← smallest_uncommon_subterms ce a,
+    notimpl
+
 
 meta def strategy.execute : strategy → conv unit := notimpl
 meta def strategy.refine : strategy → M refinement := notimpl

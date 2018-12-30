@@ -34,8 +34,8 @@ meta def set (v : V) (e : E) (g : G) : G :=
     let add_these := new_children - prev_children in
     let remove_these := prev_children - new_children in
     let parents := g.parents in
-    let parents := table.fold (dict.modify_when_present (table.erase v)) parents remove_these in
-    let parents := table.fold (dict.modify (λ t, table.insert v $ option.lhoare ∅ $ t)) parents add_these in
+    let parents := table.fold (function.swap $ dict.modify_when_present (table.erase v)) parents remove_these in
+    let parents := table.fold (function.swap $ dict.modify (λ t, table.insert v $ option.lhoare ∅ $ t)) parents add_these in
     { edges := dict.insert v e g.edges
     , parents := parents
     }
@@ -50,7 +50,7 @@ private meta def is_ancestor_aux (g : G) (v₁ : V) : Π (front : list V) (visit
 |(h :: t) visited :=
     if ¬(v₁ < h) ∧ ¬(h < v₁) then tt else
     if h ∈ visited then is_ancestor_aux t visited else
-    is_ancestor_aux (table.fold (::) t $ get_parents h g) $ table.insert h visited
+    is_ancestor_aux (table.fold (function.swap (::)) t $ get_parents h g) $ table.insert h visited
 /-- Returns tt if there exists a directed path `v₁ -> -> v₂`. -/
 meta def is_ancestor (v₁ v₂ : V) (g : G) := is_ancestor_aux g v₁ [v₂] ∅
 /-- Returns tt if there exists a (non-reflexive) directed path `v -> -> v`. -/

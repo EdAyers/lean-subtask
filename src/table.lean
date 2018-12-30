@@ -29,16 +29,17 @@ namespace table
     meta def insert_many : list α → table α → table α := λ xs t, xs.foldl (λ t x, insert x t) t
     meta instance has_insert : has_insert α (table α) := ⟨insert⟩
     meta def erase : α → table α → table α := λ x t, rb_set.erase t x
-    meta def fold {β} : (α → β → β) → β → table α → β  := λ r z t, rb_set.fold t z r
+    meta def fold {β} : (β → α → β) → β → table α → β  := λ r z t, rb_set.fold t z (function.swap r)
     meta instance : foldable (table) := ⟨λ α σ f i t, rb_set.fold t i f⟩
-    meta def mfold {T} [monad T] {β} (f : α → β → T β) (init : β) (t : table α) : T β := rb_set.mfold t init f
-    meta def inter (l : table α) (r : table α) : table α := fold (λ a acc, if a ∈ r then insert a acc else acc) ∅ l
+    meta def mfold {T} [monad T] {β} (f : β → α → T β) (init : β) (t : table α) : T β := rb_set.mfold t init (function.swap f)
+    meta def inter (l : table α) (r : table α) : table α := fold (λ acc a, if a ∈ r then insert a acc else acc) ∅ l
     meta instance has_inter : has_inter (table α) := ⟨λ l r, inter l r⟩
     /-- Return `tt` if all of the items in the table satisfy the predicate. -/
-    meta def all (p : α → bool) : table α → bool := option.is_some ∘ mfold (λ a _, if p a then some () else none) ()
+    meta def all (p : α → bool) : table α → bool := option.is_some ∘ mfold (λ _ a, if p a then some () else none) ()
     /-- Return `tt` if at least one of the elements satisfies the predicate-/
-    meta def any (p : α → bool) : table α → bool := option.is_none ∘ mfold (λ a (x : unit), if p a then none else some ()) ()
-    meta def filter (p : α → bool) : table α → table α := fold (λ k t, if p k then insert k t else t) empty
+    meta def any (p : α → bool) : table α → bool := option.is_none ∘ mfold (λ (x : unit) a, if p a then none else some ()) ()
+    meta def filter (p : α → bool) : table α → table α := fold (λ t k, if p k then insert k t else t) empty
+    meta def first : table α → option α := fold (λ o a, option.rec_on o (some a) some) none -- [HACK] highly inefficient but I can't see a better way given the interface.
     meta instance [has_to_string α] : has_to_string (table α) := ⟨λ t, (λ s, "{|" ++ s ++ "|}") $ list.to_string $ to_list $ t⟩
     meta instance has_to_tactic_format [has_to_tactic_format α] : has_to_tactic_format (table α) := 
         ⟨λ t, do
@@ -71,14 +72,16 @@ namespace dict
     meta def erase : k → dict k α → dict k α := λ k d, rb_map.erase d k
     meta def merge (l r : dict k α) := rb_map.fold r l insert
     meta instance : has_append (dict k α) := ⟨merge⟩
-    meta def fold {β} (r : k → α → β → β) (z : β) (d : dict k α) : β := rb_map.fold d z r
-    meta def mfold {T} [monad T] {β} (f : k → α → β → T β) (z : β) (d : dict k α) : T β := rb_map.mfold d z f
+    meta def fold {β} (r : β → k → α → β) (z : β) (d : dict k α) : β := rb_map.fold d z (λ k a b, r b k a)
+    meta def mfold {T} [monad T] {β} (f : β → k → α → T β) (z : β) (d : dict k α) : T β := rb_map.mfold d z (λ k a b, f b k a)
     meta def map {β} (f : α → β) (d : dict k α) : dict k β := rb_map.map f d
-    meta def filter (p : k → α → bool) (d : dict k α) := fold (λ k a d, if p k a then insert k a d else d) empty d
-    meta def collect {β} (f : k → α → dict k β) := fold (λ k a d, d ++ f k a) empty
-    meta def choose {β} (f : k → α → option β) := fold (λ k a d, match f k a with (some b) := insert k b d | none := d end) empty
-    meta def keys : dict k α → table k := fold (λ k v acc, table.insert k acc) ∅
+    meta def filter (p : k → α → bool) (d : dict k α) := fold (λ d k a, if p k a then insert k a d else d) empty d
+    meta def collect {β} (f : k → α → dict k β) := fold (λ d k a, d ++ f k a) empty
+    meta def choose {β} (f : k → α → option β) := fold (λ d k a, match f k a with (some b) := insert k b d | none := d end) empty
+    meta def keys : dict k α → table k := fold (λ acc k v, table.insert k acc) ∅
     meta def to_list : dict k α → list (k×α) := rb_map.to_list
+    /--[HACK] not efficient, don't use in perf critical code. -/
+    meta def first : dict k α → option (k×α) := fold (λ o k a, option.rec_on o (some (k,a)) some) none
     section formatting
         open format
         meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
@@ -117,7 +120,8 @@ namespace tabledict
     meta def get : κ → tabledict κ α → table α := λ k t, dict.get_default ∅ k t
     meta def contains : κ → α → tabledict κ α → bool := λ k a d,  match dict.get k d with |(some t) := t.contains a | none := ff end
     meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (tabledict κ α) := ⟨λ (d : dict κ (table α)), tactic.pp d⟩
-
+    meta def fold {β} (f : β → κ → α → β) : β → tabledict κ α → β := dict.fold (λ b k, table.fold (λ b, f b k) b)
+    meta def mfold {T} [monad T] {β} (f : β → κ → α → T β) : β → tabledict κ α → T β := dict.mfold (λ b k, table.mfold (λ b, f b k) b)
 end tabledict
 
 meta def listdict (κ : Type) (α : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] : Type := dict κ (list α)
@@ -129,6 +133,9 @@ namespace listdict
     meta def insert : κ → α → listdict κ α → listdict κ α | k a d := dict.modify_default [] (λ t, a :: t) k d
     meta def pop : κ → listdict κ α → option (α × listdict κ α) | k d := match dict.get_default [] k d with |[] := none |(h::t) := some (h, dict.insert k t d)  end
     meta def get : κ → listdict κ α → list α | k d := dict.get_default [] k d
+    meta def fold {β} (f : β → κ → α → β) : β → listdict κ α → β := dict.fold (λ b k, list.foldl (λ b, f b k) b)
+    meta def mfold {T} [monad T] {β} (f:β → κ → α → T β) : β → listdict κ α → T β := dict.mfold (λ b k, list.mfoldl (λ b, f b k) b)
+    meta def first : listdict κ α → option (κ × α) := fold (λ o k a, option.rec_on o (some (k,a)) some) none
     -- meta instance [has_to_format κ] [has_to_format α] : has_to_format (listdict κ α) := ⟨λ (d : dict κ (list α)), to_fmt d⟩
     meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (listdict κ α) := ⟨λ (d : dict κ (list α)), tactic.pp d⟩
 end listdict
