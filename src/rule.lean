@@ -38,7 +38,8 @@ namespace rule
         pf ← tactic.fabricate (some T) (do
             tactic.intros,
             tactic.applyc `eq.symm,
-            tactic.apply r.pf,
+            tactic.apply_core r.pf {new_goals := new_goals.non_dep_only},
+            all_goals $ try $ assumption,
             skip
         ),
         pure { ctxt := r.ctxt
@@ -59,9 +60,9 @@ namespace rule
                 lhspp ← pp lhs,
                 rulepp ← pp r,
                 --trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
+                tactic.apply_core r.pf,
+                all_goals $ try (apply_instance), -- clean up typeclass instances.
                 --trace_state,
-                tactic.apply r.pf,
-                all_goals $ try apply_instance, -- clean up typeclass instances.
                 -- result >>= trace,
                 pure ()
             ),  -- if new goals are created then tactic.fabricate will throw.
@@ -90,10 +91,6 @@ namespace rule
         infer_type pf, -- make sure it's valid
         of_prf pf
 
-    meta def to_conv (r : rule) : conv unit := do
-        apply r.pf,
-        try $ all_goals $ apply_instance <|> assumption,
-        pure ()
 
     meta def to_mvars (r : rule) : tactic (rule × list expr) := do
         gs ← get_goals,

@@ -51,6 +51,8 @@ meta def tactic.hypothetically' {α} (tac : tactic α) : tactic α :=
 end
     -- tactic α = interaction_monad state α = state → result state α
 
+meta def tactic.trace_m {α} [has_to_tactic_format α]: string → α → tactic unit |s a := do ppa ← tactic.pp a, trace $ (to_fmt s) ++ ppa
+
 meta def tactic.try_first {α} : list (tactic α) → tactic α
 | []            := failed
 | (tac :: tacs) := λ s,

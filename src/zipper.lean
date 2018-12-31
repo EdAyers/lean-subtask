@@ -313,6 +313,27 @@ namespace zipper
             kids ← list.join <$> list.mmap maximal_monotone children,
             pure $ kids
 
+    meta def find_occurences : expr → expr → tactic (list zipper) := λ E e,
+        maximal_monotone (λ z,
+            if z.is_mvar || z.is_constant then failure
+            else hypothetically' (unify e z.current) *> pure z
+        ) (zip E)
+
+    meta def rewrite_conv (r : rule) : conv unit := do	
+        lhs ← conv.lhs >>= instantiate_mvars,
+        sub ← instantiate_mvars r.lhs,
+        trace_m "rewrite_conv: " $ (lhs,r),
+        l ← ez.zipper.find_occurences lhs r.lhs,
+        (z::rest) ← pure l,
+        r ← apply_rule r z,
+        transitivity,
+        apply r.pf,
+        
+        try $ all_goals $ apply_instance <|> assumption,
+        trace_state, trace r,
+        pure ()
+
+
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 

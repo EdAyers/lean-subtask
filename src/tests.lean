@@ -85,6 +85,8 @@ namespace tests
             skip
         )
 
+
+
     end group_theory
 
 
@@ -112,6 +114,9 @@ namespace tests
         axiom ipR : ⟪x, y + z⟫ = ⟪x,y⟫ + ⟪x,z⟫
         axiom ipSL : ⟪μ • x,z⟫ = μ * ⟪x,z⟫
         axiom ipSR : ⟪x,μ • z⟫ = μ * ⟪x,z⟫
+        axiom ADJ : ⟪A† x, y ⟫ = ⟪x, A y⟫
+        meta def rulenames := [`L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ]
+        meta def rules := rule_table.of_names rulenames
 
         open tactic
         open ez.zipper
@@ -123,7 +128,16 @@ namespace tests
           rhs ← to_expr ```(⟪%%A† %%x + %%A† %%y, %%u⟫),
           zs ← lowest_uncommon_subterms lhs (zip rhs),
           test.equal zs.length 2,
+          trace_state,
           skip
+
+        run_cmd rules >>= trace
+
+        example : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
+        begin
+            (rules >>= robot.run robot.first_policy),
+            sorry
+        end
     end vector_theory
 
 end tests
