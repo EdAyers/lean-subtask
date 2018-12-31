@@ -150,9 +150,6 @@ match t with
     submatches ← rt.submatch e,
     strats ← list.mmap strategy.of_rule $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
     pure $ ([],strats)
-    -- [TODO] take each rule in rt, find an application of the rule that will cause a subterm of the rhs to be `e`
-    -- [TODO] is there a way of doing this that doesn't require one to search through every single rule?
-    -- I think the only way is going to be to traverse a rule when it is added and it to a dictionary "symbol ⇀ rule × zipper". 
 |(task.CreateAll a) := do
     ce ← get_ce,
     scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
@@ -169,19 +166,16 @@ meta def strategy.refine : strategy → M refinement
 |(strategy.ReduceDistance a b) := notimpl
 |(strategy.Use r)              := do
     ce ← get_ce,
-    gs ← get_goals,
-    res ← mk_mvar,
-    set_goals [res],
-    ms ← apply_core r.pf {instances := ff},
-    try $ all_goals $ apply_instance,
-    res ← instantiate_mvars res,
-    T ← infer_type res,
-    (_,lhs,rhs) ← relation_lhs_rhs T,
-    lcs ← zipper.lowest_uncommon_subterms ce $ zipper.zip rhs,
-    -- [FIXME] I'm setting mvars multiple times here. I need to 
-    -- 1. expand lhs with metas.
-    -- 2. run lowest_uncommon_subterms ce lhs.
-    notimpl	
+    ⟨r,ms⟩ ← rule.to_mvars r,
+    subs : list zipper ← zipper.minimal_monotone (λ lz,
+        if lz.is_mvar || lz.is_constant then failure else do
+        ⟨r,ms⟩ ← rule.to_mvars r,
+        l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
+        if l.empty then pure lz else failure
+    ) $ zipper.zip $ r.lhs,
+    let subs := subs.map (λ z, task.Create $ z.current),
+    pure ⟨subs, []⟩
+
 meta def stack.append_subtasks : list task → stack → list (task × stack) 
 |tasks stack := tasks.map_with_rest (λ c rest, (c,(stack_entry.task c rest []) :: stack)) 
 meta def stack.append_substrats : list strategy → stack → list (strategy × stack)

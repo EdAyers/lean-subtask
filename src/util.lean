@@ -38,12 +38,26 @@ meta def tactic.trace_fail {α} (t : tactic α) : (tactic α) | s :=
 open interaction_monad.result
 
 /--Perform `tac`, but throw away the state afterwards. -/
-meta def tactic.hypothetically (tac : tactic α) : tactic (option α) :=
+meta def tactic.hypothetically {α} (tac : tactic α) : tactic (option α) :=
 λ s, match tac s with
 |(success a s') := (success (some a) s)
 |(exception ms pos s') := (success none s) 
 end
+
+meta def tactic.hypothetically' {α} (tac : tactic α) : tactic α :=
+λ s, match tac s with
+|(success a _) := success a s
+|(exception ms pos _) := exception ms pos s
+end
     -- tactic α = interaction_monad state α = state → result state α
+
+meta def tactic.try_first {α} : list (tactic α) → tactic α
+| []            := failed
+| (tac :: tacs) := λ s,
+  match tac s with
+  | result.success a s' := result.success a s'
+  | result.exception e p _ := tactic.try_first tacs s
+  end
 
 meta def expr.binding_body_all : expr → option expr
 |(expr.pi _ _ _ b) :=  some b

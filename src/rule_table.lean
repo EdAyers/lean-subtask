@@ -100,11 +100,8 @@ namespace rule_table
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
     /--`submatch e rt` finds rules such that the rhs of the rule contains `e`-/
-    meta def submatch : expr → rule_table → tactic (list rule) | e rt := do
-        let k := get_key e, -- [TODO] need to guard against wildcards.
-        let items := rt.submatch_table.get k,
-        rules ← items.mcollect (robot.submatch.run e),
-        pure rules
+    meta def submatch : expr → rule_table → tactic (list rule) | e rt :=
+        list.mcollect (robot.submatch.run e) $ rt.submatch_table.get $ get_key e
 
 end rule_table
 
