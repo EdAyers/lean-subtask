@@ -164,10 +164,21 @@ end
 meta def strategy.execute : strategy → conv unit
 |(strategy.ReduceDistance a b) := notimpl
 |(strategy.Use r)              := rule.to_conv r
-
+open tactic
 meta def strategy.refine : strategy → M refinement
 |(strategy.ReduceDistance a b) := notimpl
-|(strategy.Use r)              :=
+|(strategy.Use r)              := do
+    ce ← get_ce,
+    gs ← get_goals,
+    res ← mk_mvar,
+    set_goals [res],
+    ms ← apply_core r.pf {instances := ff},
+    try $ all_goals $ apply_instance,
+    res ← instantiate_mvars res,
+    T ← infer_type res,
+    (_,lhs,rhs) ← relation_lhs_rhs T,
+    lcs ← zipper.lowest_uncommon_subterms ce $ zipper.zip rhs,
+    -- [FIXME] I'm setting mvars multiple times here. I need to 
     -- 1. expand lhs with metas.
     -- 2. run lowest_uncommon_subterms ce lhs.
     notimpl	

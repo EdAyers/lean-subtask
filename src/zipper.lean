@@ -321,7 +321,6 @@ namespace zipper
         -- I think that I'm going to have to stop worrying about creating tonnes of metavariables.
         if expr.occurs z.current l then failure else pure z) z
 
-
     -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
     --     hypothetically (do
     --         l_ctxt ← src.intro_ctxt [] $ l.ctxt.reverse,

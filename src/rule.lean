@@ -95,5 +95,15 @@ namespace rule
         try $ all_goals $ apply_instance <|> assumption,
         pure ()
 
+    meta def to_mvars (r : rule) : tactic (rule × list expr) := do
+        gs ← get_goals,
+        res ← mk_mvar,
+        set_goals [res],
+        ms ← apply_core r.pf {instances := ff},
+        res ← instantiate_mvars res,
+        r ← rule.of_prf res,
+        set_goals gs,
+        pure (r, prod.snd <$> ms)
+    meta def instantiate_mvars (r : rule) : tactic rule := tactic.instantiate_mvars r.pf >>= rule.of_prf 
 
 end rule

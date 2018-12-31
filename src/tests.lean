@@ -24,7 +24,7 @@ namespace tests
         open tactic
         meta def rules : tactic rule_table := rule_table.of_names [``A,``IL,``IR,``NL]
 
-        -- test the rule table is created correctly.
+        -- test the rule table is created correctly. [TODO] add assertions.
         run_cmd (do rs ← rules, trace rs, skip)
 
         -- test rule_table.rewrites
@@ -36,7 +36,7 @@ namespace tests
             x ← intro `a,
             ls ← rule_table.rewrites `((e ∙ %%x) ∙ %%x) rs,
             test.equal ls.length 12,
-            trace ls,
+            -- trace ls,
             skip
         )
 
