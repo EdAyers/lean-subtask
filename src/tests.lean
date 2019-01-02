@@ -34,15 +34,11 @@ namespace tests
             triv,
             set_goals [t],
             x ← intro `a,
-            ls ← rule_table.rewrites `((e ∙ %%x) ∙ %%x) rs,
+            ls ← rule_table.rewrites `((e ∙ %%x) ∙ %%x) rs {wilds := tt},
+            trace $ ls.map (λ r, (r,r.pf)) ,
             test.equal ls.length 12,
-            -- trace ls,
             skip
         )
-
-
-
-
     end G_theory
 
     namespace group_theory
@@ -75,11 +71,11 @@ namespace tests
             set_goals [t],
             [G,_,x] ← intros,
             -- trace_state,
-            ls ← rule_table.rewrites x rs,
+            ls ← rule_table.rewrites x rs {wilds := tt},
             test.equal ls.length 2,
             e ← to_expr $ ```(%%x * 1),
             ls ← rule.head_rewrite il e,
-            ls ← rs.rewrites e,
+            ls ← rs.rewrites e {wilds := tt},
             test.equal ls.length 7,
             --trace ls,
             skip
@@ -88,6 +84,32 @@ namespace tests
 
 
     end group_theory
+
+    namespace add_grp_theory 
+        universe u
+        variables {A : Type u} [add_comm_group A] {x y z : A}
+        def A1 : (x + y) + z = x + (y + z) := by apply add_assoc
+        def A2L : - x + x = 0 := by apply add_left_neg
+        def A2R : x + - x = 0 := by apply add_right_neg
+        def A3L : 0 + x = x := by apply zero_add
+        def A3R : x + 0 = x := by apply add_zero
+        def A4 : x + y = y + x := by apply add_comm
+        meta def rules := rule_table.of_names [ ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4]
+    end add_grp_theory
+
+    namespace ring_theory
+        universe u
+        variables {R : Type u} [comm_ring R] {x y z a b c : R}
+        def M1 : (x * y) * z = x * (y * z) := by apply mul_assoc
+        def M3L : 1 * x = x := by apply one_mul
+        def M3R : x * 1 = x := by apply mul_one
+        def M4 : x * y = y * x := by apply mul_comm
+        def D1 : x * (y + z) = (x * y) + (x * z) := by apply left_distrib
+        def D2 : (y + z) * x = y * x + z * x := by apply right_distrib
+        meta def rules : tactic rule_table := do r1 ← rule_table.of_names [
+            ``M1, ``M3L, ``M3R, ``M4, ``D1, ``D2
+        ], r2 ← add_grp_theory.rules, rule_table.join r1 r2
+    end ring_theory
 
 
     namespace vector_theory
@@ -98,6 +120,7 @@ namespace tests
         constant V : Type
         constant is_ab : add_comm_group V
         noncomputable instance : add_comm_group V := is_ab
+
         constant p : k → V → V
         infixr ` • `: 100 := p
         constant is_linear : (V → V) → Prop
@@ -114,9 +137,14 @@ namespace tests
         axiom ipR : ⟪x, y + z⟫ = ⟪x,y⟫ + ⟪x,z⟫
         axiom ipSL : ⟪μ • x,z⟫ = μ * ⟪x,z⟫
         axiom ipSR : ⟪x,μ • z⟫ = μ * ⟪x,z⟫
-        axiom ADJ : ⟪A† x, y ⟫ = ⟪x, A y⟫
-        meta def rulenames := [`L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ]
-        meta def rules := rule_table.of_names rulenames
+        axiom ADJ : is_linear A → ⟪A† x, y ⟫ = ⟪x, A y⟫
+        meta def rulenames := [
+            `L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ
+            ]
+        meta def rules : tactic rule_table := do
+            rt₁ ← rule_table.of_names rulenames,
+            rt₂ ← ring_theory.rules,
+            rule_table.join rt₁ rt₂
 
         open tactic
         open ez.zipper
@@ -133,9 +161,11 @@ namespace tests
 
         run_cmd rules >>= trace
 
-        example : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
+        example : is_linear A → ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
         begin
-            (rules >>= robot.run robot.first_policy)
+            intro h,
+
+            timetac "hello" (rules >>= robot.run robot.first_policy),
         end
     end vector_theory
 

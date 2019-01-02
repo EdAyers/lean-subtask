@@ -24,7 +24,7 @@ namespace task
     meta instance has_lt : has_lt task := ⟨λ x y, lt x y⟩
     meta instance decidable_lt : decidable_rel ((<) : task → task → Prop) := by apply_instance
     meta instance : has_to_tactic_format task := ⟨λ t, match t with
-    |(Create x) := pure (λ x, "Create " ++ x) <*> tactic.pp x
+    |(Create x) := pure ((++) "Create ") <*> tactic.pp x
     |(CreateAll x) := pure (λ x, "CreateAll " ++ x) <*> tactic.pp x
     end⟩
 end task
@@ -42,10 +42,11 @@ namespace strategy
     |s₁ s₂ := s₁.code < s₂.code
     meta instance has_lt : has_lt strategy := ⟨λ x y, lt x y⟩
     meta instance decidable_lt : decidable_rel ((<) : strategy → strategy → Prop) := by apply_instance
-    meta instance : has_to_tactic_format robot.strategy := ⟨λ s, match s with
+    meta instance : has_to_tactic_format robot.strategy := 
+    ⟨λ s, match s with
         | (Use x) := do x ← tactic.pp x, pure $ "Use " ++ x
         | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
-     end⟩
+    end⟩
 end strategy
 
 meta inductive stack_entry : Type
@@ -53,11 +54,11 @@ meta inductive stack_entry : Type
 |task  (current : task) (siblings : list task) (achieved : list task) : stack_entry
 namespace stack_entry
     meta instance of_strat : has_coe (robot.strategy) (stack_entry) := ⟨stack_entry.strategy⟩
-    meta instance has_to_tactic_format : has_to_tactic_format (stack_entry) := ⟨λ s, match s with
-    |(strategy s) := tactic.pp s
-    |(task c s a) := tactic.pp c
-    end
-    ⟩
+    meta instance has_to_tactic_format : has_to_tactic_format (stack_entry) := 
+    ⟨λ s, match s with
+        |(strategy s) := tactic.pp s
+        |(task c s a) := tactic.pp c
+    end⟩
 end stack_entry
 meta def stack := list stack_entry
 namespace stack
@@ -87,12 +88,10 @@ meta def get_ce : M expr := state_t.lift (conv.lhs >>= instantiate_mvars)
 meta def get_visited : M $ table $ expr := state.visited <$> get
 meta def get_lookahead : M (list rule) := state.lookahead <$> get
 meta def M.hypothetically {α} : M α → M (option α) := λ tac, ⟨λ s, do
-    o ← tactic.hypothetically (state_t.run tac s) ,
-    match o with
-    |none := pure (none, s)
-    |(some (a,s')) := pure (some a,s)
-    end
+    o ← tactic.hypothetically $ state_t.run tac s,
+    pure $ (option.map prod.fst o, s)
 ⟩
+meta def M.timetac {α}: string → M α → M α := λ s m, ⟨λ st, timetac s (m.run st)⟩
 -- meta def get_stack : M stack := state.stack <$> get
 meta def stack.mfold_achieved {T} [monad T] {α} (f : α → task → T α) : α → stack → T α
 | a [] := pure a
@@ -129,11 +128,11 @@ meta def task.diom : task → M (list strategy) := λ t, do
                     ppr ← pp r, 
                     trace_m "task.diom: " $ (to_fmt "found a rule: ") ++ ppr,
                     pure r 
-                else tactic.fail ""
+                else failure
         ),
         match x with
         |(some r) := pure r
-        |none := (tactic.fail "")
+        |none := failure
         end
     ) lookahead,
     winners.mmap strategy.of_rule
@@ -226,13 +225,13 @@ meta def execute_strategy : strategy → stack → M unit
     trace_m "execute_strategy: " $ s,
     state_t.lift $ strategy.execute s,
     ce' ← get_ce,
-    when (ce = ce') (tactic.fail "strategy did not change the goal."),
+    when (ce = ce') (tactic.trace "strategy did not change the goal." *> failure),
     --trace_m "execute_strategy: " $ (list.tail rest),
     stack.mfold_achieved (λ _ acheived, do 
         r ← acheived.test ce', 
-        when (¬r) (tactic.fail "stategy caused a previously achieved task to fail.")
+        when (¬r) (tactic.trace "stategy caused a previously achieved task to fail." *> failure)
     ) () $ list.tail $ rest,
-    lookahead ← rule_table.rewrites ce' state.rt,
+    lookahead ← timetac "lookahead" $ rule_table.rewrites ce' state.rt,
     let visited := state.visited.insert ce,
     put {
         state with
@@ -244,7 +243,7 @@ meta def ascend : stack → M (list (strategy × stack))
 |[] := do trace_m "ascend: " $ "done!", pure []
 |stack@((stack_entry.strategy s)::t) := do
     trace_m "ascend: " $ s,
-    (do execute_strategy s stack, ascend t) 
+    (do M.timetac "execute_strategy" $ execute_strategy s stack, ascend t) 
     <|> (do trace "ascend: execute_strategy failed", explore_strategy (s,stack))
 |stack@((stack_entry.task current siblings achieved) :: tail) := do
     trace_m "ascend: " $ current,
@@ -283,25 +282,27 @@ meta def first_policy : policy
 |l@(h::t) := do
     pph ← pp h.1,
     ppl ← pp $ list.map prod.fst l,
-    -- trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
+    trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
     pure h
 
 meta def run_aux (π : policy) : state → list (strategy × stack) → nat → conv unit
 |s [] n := pure ()
 |_ _ 0 := fail "timeout"
 |s l (n+1) := do
-    -- target >>= trace_m "run_aux: ",
-    ⟨r,s⟩ ← state_t.run (π l >>= execute) $ s,
+    -- target >>= trace_m "run_aux: ", 
+    ⟨r,s⟩ ← timetac "execute" $ state_t.run (π l >>= execute) $ s,
     run_aux s r n
 
 meta def run (π : policy) (rt : rule_table) : conv unit := do
     (_,lhs, rhs) ← target_lhs_rhs,
     lookahead ← rt.rewrites lhs,
+    --trace lookahead, 
     let s : state := {lookahead := lookahead, visited := ∅, rt := rt},
     let t := task.CreateAll rhs,
     ⟨r,s⟩ ←  state_t.run (explore_task (t, [stack_entry.task t [] []])) s,
     run_aux π s r 10,
     reflexivity
 
+meta def fake_run (π : policy) (rt : rule_table) : tactic unit := trace "fake_run: hello"
 
 end robot

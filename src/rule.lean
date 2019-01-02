@@ -29,7 +29,9 @@ namespace rule
 
     meta def of_prf : expr → tactic rule := λ pf, do
         t ← infer_type pf >>= whnf,
-        ⟨ctxt,`(%%lhs = %%rhs)⟩ ← pure $ telescope.of_pis t,
+        -- trace t, 
+        ⟨ctxt,`(%%lhs = %%rhs)⟩ ← pure $ telescope.of_pis t 
+        | (do pft ← pp pf, ppt ← pp t, fail $ (to_fmt "rule.of_prf: supplied expression ") ++ pft ++ " : " ++ ppt ++ " is not an equality proof "),
         pure {ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf, type := t}
 
     meta def flip (r : rule) : tactic rule := do
@@ -39,7 +41,7 @@ namespace rule
             tactic.intros,
             tactic.applyc `eq.symm,
             tactic.apply_core r.pf {new_goals := new_goals.non_dep_only},
-            all_goals $ try $ assumption,
+            all_goals $ try $ prop_assumption,
             skip
         ),
         pure { ctxt := r.ctxt
@@ -61,7 +63,7 @@ namespace rule
                 rulepp ← pp r,
                 --trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
                 tactic.apply_core r.pf,
-                all_goals $ try (apply_instance), -- clean up typeclass instances.
+                all_goals $ try (apply_instance <|> prop_assumption), -- clean up typeclass instances.
                 --trace_state,
                 -- result >>= trace,
                 pure ()

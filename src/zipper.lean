@@ -245,7 +245,8 @@ namespace zipper
         motive ← to_expr $ @expr.lam ff `X binder_info.default (to_pexpr T) $ ```(%%lhs' = %%(z.unzip_with $ expr.var z.depth)),
         -- pp motive >>= λ m, trace $ ("motive: ":format) ++ m,
         pf' ← tactic.fabricate (some target) (do
-            refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf)
+            refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf),
+            all_goals $ try $ (apply_instance <|> prop_assumption)
         ),
         pure (rhs',pf')
     
@@ -322,15 +323,15 @@ namespace zipper
     meta def rewrite_conv (r : rule) : conv unit := do	
         lhs ← conv.lhs >>= instantiate_mvars,
         sub ← instantiate_mvars r.lhs,
-        -- trace_m "rewrite_conv: " $ (lhs,r),
         l ← ez.zipper.find_occurences lhs r.lhs,
+        -- trace_m "rewrite_conv: " $ (lhs,r, l),
         (z::rest) ← pure l,
         r ← apply_rule r z,
         transitivity,
         apply r.pf,
         
-        try $ all_goals $ apply_instance <|> assumption,
-        -- trace_state, trace r,
+        --trace_state, trace r,
+        try $ all_goals $ apply_instance <|> prop_assumption,
         pure ()
 
 

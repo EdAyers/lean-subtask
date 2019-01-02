@@ -71,23 +71,30 @@ namespace rule_table
         revs ← rs.mmap rule.flip,
         of_rules $ rs ++ revs
     private meta def get_head_rewrites : name → rule_table → table rule | k {head_table := ht, ..} := ht.get k
-    meta def head_rewrites : expr → rule_table → (tactic $ list rule) := λ lhs rt, do
+    meta structure rewrites_config :=
+    (wilds := ff) -- include rules such as `?x = ?x * 1` where the lhs can be anything. This slows things down substantially. [TODO] optimise so that there are some type/typeclass checks on it.
+    -- (annihilators := ff) [TODO]
+    
+    meta def head_rewrites (lhs : expr) (rt : rule_table)  (cfg : rewrites_config := {}) : (tactic $ list rule) := do
         let k := get_key lhs,
         kpp ← pp k,
-        let t := get_head_rewrites `rule_table.wildcard rt ∪ get_head_rewrites k rt,
+        let wilds := if cfg.wilds then get_head_rewrites `rule_table.wildcard rt else ∅,
+        let keyed := get_head_rewrites k rt,
+        let t := wilds ∪ keyed,
         tpp ← pp t,
         --trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
         t.mfold (λ acc r, (do r ← rule.head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
 
-    private meta def rewrites_aux (rt : rule_table) : zipper → list rule → tactic (list rule)
+    private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) : zipper → list rule → tactic (list rule)
     |z acc := do
-        --trace z,
-        head_rewrites ← rt.head_rewrites z.current,
+        -- trace z,
+        hrs ← head_rewrites z.current rt cfg,
+        -- trace head_rewrites,
+        hrs ← hrs.mcollect (λ rw, ez.zipper.apply_rule rw z),
         --trace head_rewrites,
-        head_rewrites ← head_rewrites.mcollect (λ rw, ez.zipper.apply_rule rw z),
-        --trace head_rewrites,
-        acc ← pure $ head_rewrites ++ acc,
+        acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,
+        --trace children,
         acc ← children.mfoldl (λ acc z, rewrites_aux z acc) acc,
         pure acc
 
@@ -95,7 +102,7 @@ namespace rule_table
     -- [TODO] wildcard moves should have their own section, since one is constructed for each node in the tree.
     -- [TODO] similarly, anti-annihilator moves (moves which have metas after matching) should be put in their own section. If my understanding of Lean is correct, it should be possible to simply add these as metavariables to the tactic state.
 
-    meta def rewrites : expr → rule_table → (tactic $ list rule) := λ lhs rt, rewrites_aux rt (zipper.zip lhs) []
+    meta def rewrites (lhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := rewrites_aux rt cfg (zipper.zip lhs) []
 
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 

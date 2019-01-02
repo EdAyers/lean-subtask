@@ -34,6 +34,9 @@ meta def tactic.trace_fail {α} (t : tactic α) : (tactic α) | s :=
     |r := r
     end
 
+meta def prop_assumption : tactic unit := do
+    isp ← target >>= is_prop,
+    if isp then assumption else fail "target not a Prop"
 
 open interaction_monad.result
 
@@ -49,7 +52,6 @@ meta def tactic.hypothetically' {α} (tac : tactic α) : tactic α :=
 |(success a _) := success a s
 |(exception ms pos _) := exception ms pos s
 end
-    -- tactic α = interaction_monad state α = state → result state α
 
 meta def tactic.trace_m {α} [has_to_tactic_format α]: string → α → tactic unit |s a := do ppa ← tactic.pp a, trace $ (to_fmt s) ++ ppa
 
@@ -70,8 +72,6 @@ meta def expr.binding_body_all : expr → option expr
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
 |_ := ff
-
-
 
 def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []
