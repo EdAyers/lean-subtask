@@ -47,40 +47,6 @@ namespace strategy
         | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
      end⟩
 end strategy
--- meta inductive V
--- |Task : task → V
--- |Strategy : strategy → V
--- meta def V.code : V → ℕ
--- |(V.Task _) := 0
--- |(V.Strategy _) := 1
--- meta def V.lt : V → V → bool
--- |(V.Task t₁) (V.Task t₂) := t₁ < t₂
--- |(V.Strategy s₁) (V.Strategy s₂) := s₁ < s₂
--- |x y := V.code x < V.code y
--- meta instance V.has_lt : has_lt V := ⟨λ x y, V.lt x y⟩
--- meta structure E := 
--- (strategies : list strategy)
--- (tasks : list task)
--- meta def E.lt : E → E → bool
--- |⟨s₁,t₁⟩ ⟨s₂,t₂⟩ := (s₁ < s₂) || (¬(s₁ > s₂) && (t₁ < t₂))
--- meta instance E.has_lt : has_lt E := ⟨λ x y, E.lt x y⟩
--- meta def E.children : E → list V
--- |⟨ss,ts⟩ := (V.Task <$> ts) ++ (V.Strategy <$> ss)
--- meta def E.filter (p : V → bool) : E → E
--- |⟨ss,ts⟩ := ⟨ss.filter (λ s, p $ V.Strategy $ s), ts.filter (λ t, p $ V.Task $ t)⟩
--- meta instance : edge_col V E := ⟨E.children, E.filter⟩
--- meta def G := digraph V E
--- meta instance : has_mem V G := digraph.has_mem
-
--- meta structure state :=
--- (ce             : expr)
--- (lookahead      : list rule)
--- (visited        : table expr)       -- terms that have already been visited.
--- (graph          : G)                -- the task-graph.
--- (front          : table strategy)   -- a list of strategies to choose from.
--- (acheived_tasks : table task)       -- a set of tasks that have recently been achieved and which should not be unachieved until their parent is achieved.
--- (config         : config)           -- some data that should remain fixed for the duration of the tactic. [NOTE] maybe put in a reader monad?
-
 
 meta inductive stack_entry : Type
 |strategy (current : strategy)  : stack_entry
