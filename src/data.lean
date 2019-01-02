@@ -145,7 +145,7 @@ meta def task.test : expr → task → M bool
     --trace_m "task.test: " $ matches,
     pure $ bnot matches.empty
 |ce t@(task.CreateAll e) := do
-    trace_m "task.test: " $ t,
+    -- trace_m "task.test: " $ t,
     o ← hypothetically (unify e ce), 
     pure o.is_some
 meta def strategy.of_rule : rule → M strategy := λ r, pure $ strategy.Use $ r
@@ -162,15 +162,15 @@ meta def task.diom : task → M (list strategy) := λ t, do
                 if result then do
                     ppr ← pp r, 
                     trace_m "task.diom: " $ (to_fmt "found a rule: ") ++ ppr,
-                    pure r,
-                pure r else tactic.fail ""
+                    pure r 
+                else tactic.fail ""
         ),
         match x with
         |(some r) := pure r
         |none := (tactic.fail "")
         end
     ) lookahead,
-    winners.mmap (strategy.of_rule)
+    winners.mmap strategy.of_rule
 open ez
 
 meta def try_dioms : task → M refinement | t := do 
@@ -261,12 +261,11 @@ meta def execute_strategy : strategy → stack → M unit
     state_t.lift $ strategy.execute s,
     ce' ← get_ce,
     when (ce = ce') (tactic.fail "strategy did not change the goal."),
-    trace_m "execute_strategy: " $ (list.tail rest),
+    --trace_m "execute_strategy: " $ (list.tail rest),
     stack.mfold_achieved (λ _ acheived, do 
         r ← acheived.test ce', 
         when (¬r) (tactic.fail "stategy caused a previously achieved task to fail.")
     ) () $ list.tail $ rest,
-    trace "hi",
     lookahead ← rule_table.rewrites ce' state.rt,
     let visited := state.visited.insert ce,
     put {
@@ -318,27 +317,25 @@ meta def first_policy : policy
 |l@(h::t) := do
     pph ← pp h.1,
     ppl ← pp $ list.map prod.fst l,
-    trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
+    -- trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
     pure h
 
 meta def run_aux (π : policy) : state → list (strategy × stack) → nat → conv unit
 |s [] n := pure ()
 |_ _ 0 := fail "timeout"
 |s l (n+1) := do
-    target >>= trace_m "run_aux: ",
-
+    -- target >>= trace_m "run_aux: ",
     ⟨r,s⟩ ← state_t.run (π l >>= execute) $ s,
     run_aux s r n
 
 meta def run (π : policy) (rt : rule_table) : conv unit := do
-    trace "robot.run: ()",
     (_,lhs, rhs) ← target_lhs_rhs,
     lookahead ← rt.rewrites lhs,
     let s : state := {lookahead := lookahead, visited := ∅, rt := rt},
     let t := task.CreateAll rhs,
     ⟨r,s⟩ ←  state_t.run (explore_task (t, [stack_entry.task t [] []])) s,
-    -- trace r,
-    run_aux π s r 10
+    run_aux π s r 10,
+    reflexivity
 
 
 end robot

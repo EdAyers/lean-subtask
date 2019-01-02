@@ -322,7 +322,7 @@ namespace zipper
     meta def rewrite_conv (r : rule) : conv unit := do	
         lhs ← conv.lhs >>= instantiate_mvars,
         sub ← instantiate_mvars r.lhs,
-        trace_m "rewrite_conv: " $ (lhs,r),
+        -- trace_m "rewrite_conv: " $ (lhs,r),
         l ← ez.zipper.find_occurences lhs r.lhs,
         (z::rest) ← pure l,
         r ← apply_rule r z,
@@ -330,7 +330,7 @@ namespace zipper
         apply r.pf,
         
         try $ all_goals $ apply_instance <|> assumption,
-        trace_state, trace r,
+        -- trace_state, trace r,
         pure ()
 
 

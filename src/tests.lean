@@ -99,7 +99,7 @@ namespace tests
         constant is_ab : add_comm_group V
         noncomputable instance : add_comm_group V := is_ab
         constant p : k → V → V
-        infixr `•`: 100 := p
+        infixr ` • `: 100 := p
         constant is_linear : (V → V) → Prop
         constant adj : (V → V) → (V → V)
         variables {μ ν : k} {x y z : V} {A : V → V}
@@ -128,15 +128,14 @@ namespace tests
           rhs ← to_expr ```(⟪%%A† %%x + %%A† %%y, %%u⟫),
           zs ← lowest_uncommon_subterms lhs (zip rhs),
           test.equal zs.length 2,
-          trace_state,
+          --   trace_state,
           skip
 
         run_cmd rules >>= trace
 
         example : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
         begin
-            (rules >>= robot.run robot.first_policy),
-            sorry
+            (rules >>= robot.run robot.first_policy)
         end
     end vector_theory
 
