@@ -49,6 +49,10 @@ namespace tests
         def NR : x * x ⁻¹ = 1 := by apply mul_right_inv
         def IR : 1 * x = x := by apply one_mul
         def IL : x * 1 = x := by apply mul_one
+
+        def is_hom {G H : Type u} [group G] [group H] (f : G → H) := ∀ x y, f (x * y) = f x * f y
+        
+
         open tactic
 -- set_option pp.all true
         
@@ -88,12 +92,14 @@ namespace tests
     namespace add_grp_theory 
         universe u
         variables {A : Type u} [add_comm_group A] {x y z : A}
+        variables {B : Type u} [add_comm_group B]
         def A1 : (x + y) + z = x + (y + z) := by apply add_assoc
         def A2L : - x + x = 0 := by apply add_left_neg
         def A2R : x + - x = 0 := by apply add_right_neg
         def A3L : 0 + x = x := by apply zero_add
         def A3R : x + 0 = x := by apply add_zero
         def A4 : x + y = y + x := by apply add_comm
+        def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
         meta def rules := rule_table.of_names [ ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4]
     end add_grp_theory
 
@@ -110,6 +116,30 @@ namespace tests
             ``M1, ``M3L, ``M3R, ``M4, ``D1, ``D2
         ], r2 ← add_grp_theory.rules, rule_table.join r1 r2
     end ring_theory
+
+    namespace set_rules
+        universe u
+        variables {α : Type u} {A B C : set α}
+        instance : has_sub (set α) := ⟨λ A B, A ∩ (- B)⟩
+        def ext : (∀ a, a ∈ A ↔ a ∈ B) → A = B := begin intro, funext, rw <-iff_eq_eq, apply a x end
+        def A1 : A - B = A ∩ (- B) := rfl
+        def A2 : - ( B ∩ C ) = -B ∪ -C := ext $ λ a, ⟨λ h, classical.by_cases (λ aB, classical.by_cases (λ aC, absurd (and.intro aB aC) h) or.inr ) or.inl,λ h, or.cases_on h (λ h ⟨ab,_⟩, absurd ab h) (λ h ⟨_,ac⟩, absurd ac h)⟩
+        def A3 :  - ( B ∪ C ) = - B ∩ - C := ext $ λ a, ⟨λ h, ⟨h ∘ or.inl,h ∘ or.inr⟩, λ ⟨x,y⟩ h₂, or.cases_on h₂ x y⟩ 
+        def A4 : B ∩ C = C ∩ B := ext $ λ a, ⟨and.swap,and.swap⟩
+        def A5 : B ∪ C = C ∪ B := ext $ λ a, ⟨or.swap, or.swap⟩
+        def A6 : A ∪ (B ∩ C) = (A ∪ B) ∩ (A ∪ C) := ext $ λ a, ⟨λ h, or.cases_on h (λ h, ⟨or.inl h, or.inl h⟩) (λ ⟨b,c⟩, ⟨or.inr b, or.inr c⟩),λ ⟨ab,ac⟩, or.cases_on ab or.inl $ λ b, or.cases_on ac or.inl $ λ c, or.inr ⟨b,c⟩⟩ -- [NOTE] use mathlib, don't be macochistic.
+        def A7 : A ∩ (B ∪ C) = (A ∩ B) ∪ (A ∩ C) := ext $ λ a, ⟨λ ⟨a,bc⟩,or.cases_on bc (λ b, or.inl ⟨a,b⟩) (λ c, or.inr ⟨a,c⟩), λ h, or.cases_on h (λ ⟨a,b⟩, ⟨a,or.inl b⟩) (λ ⟨a,c⟩, ⟨a,or.inr c⟩)⟩
+        def A8 : (A ∩ B) ∩ C = A ∩ (B ∩ C)  := ext $ λ a, and.assoc
+        def A9 : (A ∪ B) ∪ C = A ∪ (B ∪ C)  := ext $ λ a, or.assoc
+        def A10 : A ∪ ∅ = A := ext $ λ _, or_false _
+        def A11 : A ∩ ∅ = ∅ := ext $ λ _, and_false _
+        def A12 : A ∪ set.univ = set.univ := ext $ λ _, or_true _
+        def A13 : A ∩ set.univ = A := ext $ λ _, and_true _
+        meta def rules := rule_table.of_names [
+            ``A1, ``A2, ``A3, ``A4, ``A5, ``A6, ``A7, ``A8, ``A9
+            , ``A10, ``A11, ``A12, ``A13 
+        ]
+    end set_rules
 
 
     namespace vector_theory
@@ -138,13 +168,17 @@ namespace tests
         axiom ipSL : ⟪μ • x,z⟫ = μ * ⟪x,z⟫
         axiom ipSR : ⟪x,μ • z⟫ = μ * ⟪x,z⟫
         axiom ADJ : is_linear A → ⟪A† x, y ⟫ = ⟪x, A y⟫
+        axiom COMP_DEF {α β γ} {f : β → γ} {g : α → β} {x : α} : (f ∘ g) x = f (g x)
         meta def rulenames := [
-            `L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ
+            `L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ,
+            `COMP_DEF
             ]
         meta def rules : tactic rule_table := do
             rt₁ ← rule_table.of_names rulenames,
             rt₂ ← ring_theory.rules,
-            rule_table.join rt₁ rt₂
+            rt₃ ← set_rules.rules,
+            rt ← rule_table.join rt₁ rt₂,
+            rule_table.join rt rt₃
 
         open tactic
         open ez.zipper
@@ -164,8 +198,25 @@ namespace tests
         example : is_linear A → ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
         begin
             intro h,
+            (do
+                rs ← rules,
+                timetac "robot.run" $ robot.run robot.score_policy rs
+            )
+        end
 
-            timetac "hello" (rules >>= robot.run robot.first_policy),
+        example {α : Type u} {A B C : set α} : A - (B ∩ C) = (A - B) ∪ (A - C) :=
+        begin
+            rules >>= robot.run robot.score_policy,
+
+        end
+
+        example {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} (l : ∀ x y, φ (x * y) = φ x * φ y) (i1 : ∀ x, φ(ψ x) = x) (i2 : ∀ x, ψ(φ x) = x) {x y : G} : ψ (x * y) = ψ x * ψ y :=
+        begin
+            rules >>= robot.run robot.first_policy
+        end
+        example {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} (l : ∀ x y, φ (x * y) = φ x * φ y) (l2 : ∀ x y, ψ (x * y) = ψ x * ψ y) {x y : G} : (φ ∘ ψ) (x * y) = (φ ∘ ψ) x * (φ ∘ ψ) y :=
+        begin
+            rules >>= robot.run robot.first_policy
         end
     end vector_theory
 

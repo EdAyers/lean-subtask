@@ -51,6 +51,7 @@ namespace rule_table
     meta def empty : rule_table := {head_table := ∅, submatch_table := ∅}
 
     meta def get_key : expr → name
+    |(expr.app (expr.var f) a) := `rule_table.app
     |(expr.app f a) := get_key f
     |(expr.const n _) := n
     |(expr.var n) := `rule_table.wildcard

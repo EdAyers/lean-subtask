@@ -180,7 +180,7 @@ namespace zipper
     meta def mmap {T} [monad T] : (expr → T expr) → zipper → T zipper
     |f ⟨p,ctxt,e⟩ := zipper.mk p ctxt <$> f e
     /--The number of binders above the cursor. -/
-    meta def depth : zipper → ℕ := list.length ∘ zipper.ctxt
+    meta def binder_depth : zipper → ℕ := list.length ∘ zipper.ctxt
     meta def unzip_with : expr → zipper → expr := λ e z, unzip $ z.set_current e
     meta def is_var : zipper → bool := expr.is_var ∘ current
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
@@ -222,7 +222,7 @@ namespace zipper
     open tactic
     /-- Given a zipper, makes a congruence lemma at the zipper's position. Assumes that the zipper is not inside any binders (for now) -/
     meta def mk_congr (z : zipper) : tactic expr := do
-        when (z.depth ≠ 0) (tactic.fail "Not implemented: congruences inside a binder"),
+        when (z.binder_depth ≠ 0) (tactic.fail "Not implemented: congruences inside a binder"),
         let lhs := z.current,
         let lhs' := z.unzip,
         T ← tactic.infer_type lhs,
@@ -233,7 +233,7 @@ namespace zipper
             -- get_goals >>= list.mmap infer_type >>= trace,
             pure ()
         ) 
-    meta def unzip_free : zipper → expr := λ z, z.unzip_with $ expr.var z.depth
+    meta def unzip_free : zipper → expr := λ z, z.unzip_with $ expr.var z.binder_depth
     /-- `apply_congr (rhs,pf) z` takes the given `%%pf : %%z.current = %%rhs` and makes a congruence lemma using the given zipper.  -/
     meta def apply_congr : (expr × expr) → zipper → tactic (expr × expr) := λ ⟨rhs,pf⟩ z, do
         let lhs := z.current,
@@ -242,7 +242,7 @@ namespace zipper
         let rhs' := unzip_with rhs z,
         target ← to_expr $ ```(%%lhs' = %%rhs'),
         -- pp target >>= λ m, trace $ ("target: ":format) ++ m,
-        motive ← to_expr $ @expr.lam ff `X binder_info.default (to_pexpr T) $ ```(%%lhs' = %%(z.unzip_with $ expr.var z.depth)),
+        motive ← to_expr $ @expr.lam ff `X binder_info.default (to_pexpr T) $ ```(%%lhs' = %%(z.unzip_with $ expr.var z.binder_depth)),
         -- pp motive >>= λ m, trace $ ("motive: ":format) ++ m,
         pf' ← tactic.fabricate (some target) (do
             refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf),
@@ -314,16 +314,16 @@ namespace zipper
             kids ← list.join <$> list.mmap maximal_monotone children,
             pure $ kids
 
-    meta def find_occurences : expr → expr → tactic (list zipper) := λ E e,
+    meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e,
         maximal_monotone (λ z,
             if z.is_mvar || z.is_constant then failure
             else hypothetically' (unify e z.current) *> pure z
-        ) (zip E)
+        ) E
 
     meta def rewrite_conv (r : rule) : conv unit := do	
         lhs ← conv.lhs >>= instantiate_mvars,
         sub ← instantiate_mvars r.lhs,
-        l ← ez.zipper.find_occurences lhs r.lhs,
+        l ← ez.zipper.find_occurences (zip lhs) r.lhs,
         -- trace_m "rewrite_conv: " $ (lhs,r, l),
         (z::rest) ← pure l,
         r ← apply_rule r z,
@@ -335,6 +335,8 @@ namespace zipper
         pure ()
 
 
+    
+
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
@@ -342,6 +344,9 @@ namespace zipper
         -- [TODO] this should instead be l.zip.maximal_monotone (λ lz, z ⊎ lz)
         -- I think that I'm going to have to stop worrying about creating tonnes of metavariables.
         if expr.occurs z.current l then failure else pure z) z
+
+    meta def largest_common_subterms (z₁ : zipper) (z₂ : zipper) : tactic (list zipper) :=
+        list.join <$> z₁.maximal_monotone (λ z₁, if z₁.is_mvar then failure else do ocs ← find_occurences (z₂) z₁.current, if ocs.empty then failure else pure ocs) 
 
     -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
     --     hypothetically (do

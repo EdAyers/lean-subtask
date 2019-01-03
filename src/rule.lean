@@ -1,4 +1,4 @@
-import .util
+import .util .table
 open tactic
 @[derive decidable_eq]
 meta structure hyp :=
@@ -104,5 +104,20 @@ namespace rule
         set_goals gs,
         pure (r, prod.snd <$> ms)
     meta def instantiate_mvars (r : rule) : tactic rule := tactic.instantiate_mvars r.pf >>= rule.of_prf 
+
+    meta def get_local_const_dependencies (r : rule) : tactic (list expr) := do
+        pf ← tactic.instantiate_mvars r.pf,
+        let lcs :=  list_local_consts pf,
+        pure lcs
+
+    meta def is_local_hypothesis (r : rule) : tactic bool := do 
+        lcds ← r.get_local_const_dependencies >>= list.mmap infer_type >>= list.mmap is_prop ,
+    -- [HACK] I am assuming that there are no subtypings and so on which is probably a bad assumption.
+        pure $ list.any lcds id
+
+    meta def count_metas (r : rule) : tactic nat := do
+        lhs ← tactic.instantiate_mvars r.lhs,
+        pure $ table.size $ expr.fold r.lhs (table.empty) (λ e _ t, if expr.is_mvar e then table.insert e t else t)
+
 
 end rule

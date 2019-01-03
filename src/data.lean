@@ -28,6 +28,7 @@ namespace task
     |(CreateAll x) := pure (λ x, "CreateAll " ++ x) <*> tactic.pp x
     end⟩
 end task
+@[derive decidable_eq]
 meta inductive strategy : Type
 |Use : rule → strategy
 |ReduceDistance : expr → expr → strategy
@@ -69,7 +70,13 @@ meta structure state :=
 (visited : table expr)
 -- (stack : stack)
 (rt : rule_table)
-
+-- @[derive decidable_eq]
+meta structure action :=
+(strategy : strategy)
+(stack : stack)
+namespace action
+    meta instance : has_to_tactic_format action := ⟨λ ⟨s,ss⟩, pp s⟩
+end action
 /-- The robot monad. -/
 meta def M : Type → Type := state_t state conv
 meta instance : monad M := state_t.monad
@@ -106,7 +113,7 @@ meta def task.test : expr → task → M bool
     e ← instantiate_mvars e,
     pp_ce ← pp ce, pp_e ← pp e,
     --trace_m "task.test: " $ (to_fmt "testing that " ++ pp_ce ++ " satisfies Create " ++ pp_e),
-    matches : list ez.zipper ← ez.zipper.find_occurences ce e ,
+    matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e ,
     --trace_m "task.test: " $ matches,
     pure $ bnot matches.empty
 |ce t@(task.CreateAll e) := do
@@ -182,14 +189,15 @@ meta def strategy.refine : strategy → M refinement
 
 meta def stack.append_subtasks : list task → stack → list (task × stack) 
 |tasks stack := tasks.map_with_rest (λ c rest, (c,(stack_entry.task c rest []) :: stack)) 
-meta def stack.append_substrats : list strategy → stack → list (strategy × stack)
-|ss stack := ss.map(λ s, (s,stack_entry.strategy s :: stack))
+meta def stack.append_substrats : list strategy → stack → list action
+|ss stack := ss.map(λ s, ⟨s,stack_entry.strategy s :: stack⟩)
 meta def stack.has_task : stack → task → bool
 |s t  := list.any s (λ x, match x with |(stack_entry.task x _ _) := equiv t x | _ := ff end)
 meta def stack.has_strat : stack → strategy → bool
+-- [BUG] is not spotting identical strategies when they contain metavariables.
 |s t  := list.any s (λ x, match x with |(stack_entry.strategy x) := equiv t x | _ := ff end)
 
-meta def explore_tasks : list (task × stack) → list (strategy × stack) → M (list (strategy × stack))
+meta def explore_tasks : list (task × stack) → list action → M (list action)
 |[] acc := pure acc
 |((t,st) :: rest) acc := do
     state ← get,
@@ -205,18 +213,18 @@ meta def explore_tasks : list (task × stack) → list (strategy × stack) → M
     let acc := substrats ++ acc,
     explore_tasks (subtasks ++ rest) acc
 
-meta def explore_task : (task × stack) → M (list (strategy × stack))
+meta def explore_task : (task × stack) → M (list action)
 |ts := explore_tasks [ts] []
 
-meta def explore_strategy : (strategy × stack) → M (list (strategy × stack))
+meta def explore_strategy : action → M (list action)
 | ⟨s,stack⟩ := do
     (subtasks, substrats) ← strategy.refine s,
     explore_tasks (stack.append_subtasks subtasks) (stack.append_substrats substrats)
 
-meta def explore : stack → M (list (strategy × stack))
+meta def explore : stack → M (list action)
 |[] := failure
 |s@((stack_entry.task t _ _) :: _) := explore_task (t,s)
-|s@((stack_entry.strategy t) :: _) := explore_strategy (t,s)
+|s@((stack_entry.strategy t) :: _) := explore_strategy ⟨t,s⟩
 
 meta def execute_strategy : strategy → stack → M unit
 |s rest := do
@@ -239,12 +247,12 @@ meta def execute_strategy : strategy → stack → M unit
         , visited := visited
     }
 
-meta def ascend : stack → M (list (strategy × stack))
+meta def ascend : stack → M (list action)
 |[] := do trace_m "ascend: " $ "done!", pure []
 |stack@((stack_entry.strategy s)::t) := do
-    trace_m "ascend: " $ s,
-    (do M.timetac "execute_strategy" $ execute_strategy s stack, ascend t) 
-    <|> (do trace "ascend: execute_strategy failed", explore_strategy (s,stack))
+    -- trace_m "ascend: " $ s,
+    (do execute_strategy s stack, ascend t) 
+    <|> (do /-trace "ascend: execute_strategy failed",-/ explore_strategy ⟨s,stack⟩)
 |stack@((stack_entry.task current siblings achieved) :: tail) := do
     trace_m "ascend: " $ current,
     ce ← get_ce,
@@ -253,17 +261,19 @@ meta def ascend : stack → M (list (strategy × stack))
         let achieved := current::achieved in
         match siblings with
         |[] := ascend tail
-        |_ :=
-            let front := siblings.map_with_rest (λ subtask siblings, (subtask, (stack_entry.task subtask siblings achieved)::tail)) in
-            explore_tasks front [] 
+        |_ := do
+            let front := siblings.map_with_rest (λ subtask siblings, (subtask, (stack_entry.task subtask siblings achieved)::tail)), 
+            actions ← explore_tasks front [],
+            if (actions.empty) then ascend tail else pure actions 
         end
     else 
         explore_task (current, stack)
 
-meta def execute : (strategy × stack) → M (list (strategy × stack))
-| ⟨strat, t⟩ := ascend t
 
-meta def init (rt : rule_table) : M (list (strategy × stack)) := do
+meta def execute : action → M (list action)
+| a := do ss ← ascend (a.stack), pure $ ss.map (λ ⟨s,ss⟩, action.mk s ss)
+
+meta def init (rt : rule_table) : M (list action) := do
     (_,lhs,rhs) ← target_lhs_rhs,
     lookahead ← rt.rewrites lhs,
     put $ {
@@ -274,18 +284,57 @@ meta def init (rt : rule_table) : M (list (strategy × stack)) := do
     t ← pure $ task.CreateAll rhs,
     explore_task (t, [stack_entry.task t [] []])
 
-meta def policy := list (strategy × stack) → M (strategy × stack)
+
+
+meta def policy := list action → M (action)
 
 /--A simple policy that just tries the first one. -/
 meta def first_policy : policy
 |[] := failure
 |l@(h::t) := do
     pph ← pp h.1,
-    ppl ← pp $ list.map prod.fst l,
+    ppl ← pp $ list.map action.strategy l,
     trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
     pure h
 
-meta def run_aux (π : policy) : state → list (strategy × stack) → nat → conv unit
+meta def score_rule (r : rule) : M int := do
+    is_local ← r.is_local_hypothesis,
+    meta_count ← r.count_metas, 
+    ce ← get_ce,
+    lcsts ← zipper.largest_common_subterms (zipper.zip ce) (zipper.zip r.lhs),
+    trace_m "score_rule: " $ lcsts,
+    let lcsts := lcsts.foldl (λ acc z, if z.is_terminal then acc else acc + 1 ) 0 ,
+    pure $ 0 + (if is_local then 100 else 0) - meta_count + lcsts
+
+meta def score_strategy : strategy → M int
+|(strategy.ReduceDistance a b) := pure 0
+|(strategy.Use r) := score_rule r
+
+
+meta def score_policy : policy
+|[] := failure
+|l@(h::t) := do
+    scores ← list.mmap (λ x, score_strategy x.strategy) l,
+    scoreboard ← pure $ list.zip l scores,
+    ppsb ← scoreboard.mmap (λ ⟨s,b⟩, do pps ← pp s, pure $ (to_fmt $ to_string b) ++ format.space ++ pps),
+    tactic.trace_m "score_policy: \n" $ ppsb,
+    ⟨a,_⟩ ← list.maxby (prod.snd) $ list.zip l scores,
+    pure a
+
+    /- [TODO] give a human-tuned, ad-hoc score based on:
+        - [ ] what previous strategies were chosen from? That is, suppose a strategy came up earlier, then it would be good to detect that it should be a good idea now.
+        - [ ] Is the strategy a diom? If yes then it should be preferred, but only if it doesn't introduce too many more metas.
+        - [ ] How many siblings does the strategy have? If this number is low we should prefer it.
+        - [x] Is the rule an assumption, or a library rule?
+        - [ ] Does the rule have high definitional depth?
+        - [x] How many metas are introduced?
+        - [ ] Some type-theoretical information??? eg, if the rule is for a specific type or for any type.
+        - [x] on a `Use`, if there are large subterms already present then that's good.
+
+     -/ 
+     
+
+meta def run_aux (π : policy) : state → list action → nat → conv unit
 |s [] n := pure ()
 |_ _ 0 := fail "timeout"
 |s l (n+1) := do
@@ -293,10 +342,19 @@ meta def run_aux (π : policy) : state → list (strategy × stack) → nat → 
     ⟨r,s⟩ ← timetac "execute" $ state_t.run (π l >>= execute) $ s,
     run_aux s r n
 
+/--Add all of the rules which appear in the local context. -/
+meta def add_hyp_rules (rt : rule_table) : tactic rule_table :=
+    local_context >>= list.mfoldl (λ rt r, (do 
+        r ← rule.of_prf r, 
+        rev ← rule.flip r, 
+        pure rt >>= rule_table.insert r >>= rule_table.insert rev
+    ) <|> pure rt) rt
+
 meta def run (π : policy) (rt : rule_table) : conv unit := do
+    rt ← add_hyp_rules rt,
     (_,lhs, rhs) ← target_lhs_rhs,
     lookahead ← rt.rewrites lhs,
-    --trace lookahead, 
+    -- trace rt,
     let s : state := {lookahead := lookahead, visited := ∅, rt := rt},
     let t := task.CreateAll rhs,
     ⟨r,s⟩ ←  state_t.run (explore_task (t, [stack_entry.task t [] []])) s,

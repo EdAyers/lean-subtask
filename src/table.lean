@@ -49,6 +49,7 @@ namespace table
     -- meta instance [decidable_eq α] {t₁ t₂ : table α} : decidable (t₁ = t₂) := dite (are_equal t₁ t₂) (is_true) (is_false)
     /-- A total ordering on tables. -/
     meta def compare : table α → table α → Prop := λ t₁ t₂, to_list t₁ < to_list t₂
+    meta def size : table α → ℕ := rb_set.size
     meta instance : has_lt (table α) := ⟨compare⟩
     meta instance : decidable_rel ((<) : table α → table α → Prop) := λ t₁ t₂, list.has_decidable_lt (to_list t₁) (to_list t₂)
 end table

@@ -1,10 +1,17 @@
 open tactic
 
+/- [TODO] most of these are implemented in mathlib. Consider referencing mathlib and using these. -/
+
 universes u v
 section
 variables {α : Type u} {β : Type v}
 
 meta def notimpl : α := undefined_core "not implemented"
+
+
+def list.maxby {α} (f : α → int) (l : list α) : option α := 
+prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.rec_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
+
 
 meta def new_goal : option expr → tactic expr
 |none := mk_mvar
@@ -68,6 +75,9 @@ meta def expr.binding_body_all : expr → option expr
 |(expr.lam _ _ _ b) := some b
 |(expr.elet _ _ _ b) :=some b
 |_ := none
+
+meta def list_local_consts (e : expr) : list expr :=
+e.fold [] (λ e' _ es, if e'.is_local_constant then insert e' es else es)
 
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
