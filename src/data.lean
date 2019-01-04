@@ -162,7 +162,7 @@ match t with
     pure $ ([],strats)
 |(task.CreateAll a) := do
     ce ← get_ce,
-    tactic.trace "refine CreateAll",
+    -- tactic.trace "refine CreateAll",
     scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
     if scs.length = 0 then notimpl else do
     let scs := task.Create <$> zipper.current <$> scs,
@@ -239,7 +239,7 @@ meta def execute_strategy : strategy → stack → M unit
         r ← acheived.test ce', 
         when (¬r) (tactic.trace "stategy caused a previously achieved task to fail." *> failure)
     ) () $ list.tail $ rest,
-    lookahead ← timetac "lookahead" $ rule_table.rewrites ce' state.rt,
+    lookahead ← rule_table.rewrites ce' state.rt,
     let visited := state.visited.insert ce,
     put {
         state with
@@ -294,7 +294,7 @@ meta def first_policy : policy
 |l@(h::t) := do
     pph ← pp h.1,
     ppl ← pp $ list.map action.strategy l,
-    trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
+    -- trace_m "first_policy: " $ (to_fmt "choose ") ++ ppl,
     pure h
 
 meta def score_rule (r : rule) : M int := do
@@ -302,7 +302,7 @@ meta def score_rule (r : rule) : M int := do
     meta_count ← r.count_metas, 
     ce ← get_ce,
     lcsts ← zipper.largest_common_subterms (zipper.zip ce) (zipper.zip r.lhs),
-    trace_m "score_rule: " $ lcsts,
+    -- trace_m "score_rule: " $ lcsts,
     let lcsts := lcsts.foldl (λ acc z, if z.is_terminal then acc else acc + 1 ) 0 ,
     pure $ 0 + (if is_local then 100 else 0) - meta_count + lcsts
 
@@ -317,7 +317,7 @@ meta def score_policy : policy
     scores ← list.mmap (λ x, score_strategy x.strategy) l,
     scoreboard ← pure $ list.zip l scores,
     ppsb ← scoreboard.mmap (λ ⟨s,b⟩, do pps ← pp s, pure $ (to_fmt $ to_string b) ++ format.space ++ pps),
-    tactic.trace_m "score_policy: \n" $ ppsb,
+    -- tactic.trace_m "score_policy: \n" $ ppsb,
     ⟨a,_⟩ ← list.maxby (prod.snd) $ list.zip l scores,
     pure a
 
@@ -331,6 +331,7 @@ meta def score_policy : policy
         - [ ] Some type-theoretical information??? eg, if the rule is for a specific type or for any type.
         - [x] on a `Use`, if there are large subterms already present then that's good.
 
+    [TODO] backtrack when there are lots of possible actions all with bad scores.
      -/ 
      
 
@@ -339,7 +340,7 @@ meta def run_aux (π : policy) : state → list action → nat → conv unit
 |_ _ 0 := fail "timeout"
 |s l (n+1) := do
     -- target >>= trace_m "run_aux: ", 
-    ⟨r,s⟩ ← timetac "execute" $ state_t.run (π l >>= execute) $ s,
+    ⟨r,s⟩ ← state_t.run (π l >>= execute) $ s,
     run_aux s r n
 
 /--Add all of the rules which appear in the local context. -/

@@ -144,12 +144,19 @@ namespace tests
 
     namespace vector_theory
         universes u
-        constant k : Type
-        constant is_field : field k
-        noncomputable instance : field k := is_field
-        constant V : Type
-        constant is_ab : add_comm_group V
-        noncomputable instance : add_comm_group V := is_ab
+        variables {k : Type u} [field k] {μ ν : k}
+        variables {V : Type u} [add_comm_group V] {x y z : V}
+
+        class has_scalar_prod (k : Type u) (V : Type u) :=
+        (scalar_prod : k → V → V)
+        infixr ` • `:100 := has_scalar_prod.scalar_prod
+        
+        class vector_space (k : Type u) [field k] (V : Type u) [add_comm_group V] extends has_scalar_prod k V :=
+        (scalar_dist {μ : k} {x y : V} : μ • (x + y) = μ • x + μ • y)
+        (scalar_dist {μ \nu: k} {x : V} : μ • (x + y) = μ • x + μ • y)
+        (scalar_mul {μ ν : k} {x : V} : (μ * ν) • x = μ • ν • x)
+
+
 
         constant p : k → V → V
         infixr ` • `: 100 := p
@@ -170,8 +177,8 @@ namespace tests
         axiom ADJ : is_linear A → ⟪A† x, y ⟫ = ⟪x, A y⟫
         axiom COMP_DEF {α β γ} {f : β → γ} {g : α → β} {x : α} : (f ∘ g) x = f (g x)
         meta def rulenames := [
-            `L1, `L2,`SS, `LL, `ipL, `ipR,`ipSL,`ipSR,`ADJ,
-            `COMP_DEF
+            ``L1, ``L2,``SS, ``LL, ``ipL, ``ipR,``ipSL,``ipSR,``ADJ,
+            ``COMP_DEF
             ]
         meta def rules : tactic rule_table := do
             rt₁ ← rule_table.of_names rulenames,
@@ -195,30 +202,37 @@ namespace tests
 
         run_cmd rules >>= trace
 
-        example : is_linear A → ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
-        begin
-            intro h,
-            (do
-                rs ← rules,
-                timetac "robot.run" $ robot.run robot.score_policy rs
-            )
-        end
 
-        example {α : Type u} {A B C : set α} : A - (B ∩ C) = (A - B) ∪ (A - C) :=
-        begin
-            rules >>= robot.run robot.score_policy,
 
-        end
 
-        example {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} (l : ∀ x y, φ (x * y) = φ x * φ y) (i1 : ∀ x, φ(ψ x) = x) (i2 : ∀ x, ψ(φ x) = x) {x y : G} : ψ (x * y) = ψ x * ψ y :=
-        begin
-            rules >>= robot.run robot.first_policy
-        end
-        example {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} (l : ∀ x y, φ (x * y) = φ x * φ y) (l2 : ∀ x y, ψ (x * y) = ψ x * ψ y) {x y : G} : (φ ∘ ψ) (x * y) = (φ ∘ ψ) x * (φ ∘ ψ) y :=
-        begin
-            rules >>= robot.run robot.first_policy
-        end
     end vector_theory
+    
+    meta def equate := vector_theory.rules >>= robot.run robot.score_policy
+
+
+    section
+        universe u
+        variables {A : V → V} {x y z : V}
+        example (il : is_linear A) : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
+        by equate
+    end
+    section
+        universe u
+        variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y : G}
+        
+        example (l : ∀ x y, φ (x * y) = φ x * φ y) (i1 : ∀ x, φ(ψ x) = x) (i2 : ∀ x, ψ(φ x) = x) {x y : G} : ψ (x * y) = ψ x * ψ y :=
+        by equate
+        example (l : ∀ x y, φ (x * y) = φ x * φ y) (l2 : ∀ x y, ψ (x * y) = ψ x * ψ y) {x y : G} : (φ ∘ ψ) (x * y) = (φ ∘ ψ) x * (φ ∘ ψ) y :=
+        by equate
+    end
+    section
+        universe u
+        variables {α : Type u} {X B C : set α}
+        example : X - (B ∩ C) = (X - B) ∪ (X - C) := by equate
+        example : ( X - B ) ∪ ( X - C ) = X - ( B ∩ C ) := by equate
+        example : ( X - B ) - C = X - ( B ∪ C ) := by equate
+        example : X - ( B ∪ C ) = ( X - B ) - C := by equate
+    end
 
 end tests
 
