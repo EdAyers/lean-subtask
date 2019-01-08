@@ -61,6 +61,15 @@ namespace stack_entry
         |(strategy s) := tactic.pp s
         |(task c s a) := tactic.pp c
     end⟩
+    meta def code : stack_entry → ℕ
+    |(strategy _) := 0
+    |(task _ _ _) := 1
+    meta def lt : stack_entry → stack_entry → bool
+    |(strategy x) (strategy y) := x < y
+    |(task x _ _) (task y _ _) := x < y
+    |x y := code x < code y
+    meta instance : has_lt stack_entry := ⟨λ x y, lt x y⟩
+    meta instance : decidable_rel ((<) : stack_entry → stack_entry → Prop) := by apply_instance
 
 end stack_entry
 /--A stack of tasks and strategies. -/
@@ -77,6 +86,29 @@ meta inductive task_tree
 meta structure action :=
 (strategy : strategy)
 (stack : stack)
+
+namespace task_tree
+    meta def of_stacks_aux : list (list stack_entry) → option task_tree
+    | lls :=
+            match lls.head with 
+            |[] := none
+            |((stack_entry.task t _ _)::_) := 
+                let llls := list.partition_many (λ s₁ s₂, equiv (list.take1 s₁) (list.take1 s₂)) lls in
+                --trace "asdf" $
+                some $ task_tree.branch t $ llls.choose (of_stacks_aux ∘ list.tail)
+            |((stack_entry.strategy s ) :: _) :=
+                some (task_tree.leaf s)
+            end
+    meta def of_stacks : list stack → option task_tree := of_stacks_aux ∘ (list.map list.reverse)
+    meta def of_actions : list action → option task_tree := of_stacks ∘ (list.map action.stack)
+    meta def pretty : task_tree → tactic format
+    |(task_tree.branch t ch) := do
+        ppt ← pp t,
+        ppch ← format.group <$> format.join <$> list.map ((++) (format.line ++ "├─ ")) <$> list.mmap pretty ch,
+        pure $ "─┬─" ++ ppt ++ format.indent (ppch) 1
+    |(task_tree.leaf s) := do pps ← pp s, pure $ "▶ " ++ pps
+    meta instance : has_to_tactic_format task_tree := ⟨pretty⟩
+end task_tree
 -- meta instance action.decidable_eq : decidable_eq action := λ a₁ a₂, a₁.stack = a₂.stack
 /-- A rough backtracking mechanism. [TODO] I don't think I need to hold on to tactic state. Instead I should use the tactic monad itself or some modification thereof. -/
 meta def memento := (tactic_state × list action)
@@ -232,6 +264,10 @@ meta def stack.has_strat : stack → strategy → bool
 -- [BUG] is not spotting identical strategies when they contain metavariables.
 |s t  := list.any s (λ x, match x with |(stack_entry.strategy x) := strategy.equiv t x  | _ := ff end)
 
+meta def explore_task' : stack → task → M (stack × task_tree)
+|s t := do
+    
+
 meta def explore_tasks : list (task × stack) → list action → M (list action)
 |[] acc := pure acc
 |((t,st) :: rest) acc := do
@@ -290,9 +326,6 @@ meta def trace_path : M unit := do
     trace ce,
     path ← get_path,
     path.mmap' (λ x, do p ← pp x, trace $ (to_fmt "  = ") ++ p)
-
-
-
 
 
 meta def ascend : stack → M (list action)
@@ -427,6 +460,10 @@ meta def run_aux (π : policy) : state → list action → nat → conv unit
             (A::rest) ← π As |(state_t.lift $ trace "policy failed") *> failure,
             push_backtracks rest,
             As ← execute A,
+            state_t.lift $ tactic.try $ (
+               do tsks ← trace_fail $ tactic.returnopt $ task_tree.of_actions As,
+                trace_m "run_aux: \n" $ tsks
+            ),
             pure As
         ) s,
         run_aux s As n

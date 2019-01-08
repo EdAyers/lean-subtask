@@ -103,7 +103,15 @@ def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β
             <*> (some <$> f h <|> pure none) 
             <*> list.mcollect t
 
+private meta def list.partition_many_aux {α} (equ : α → α → bool) : list α → list (list α) → list (list α) 
+|(h::t) acc := let ⟨eqs,non_eqs⟩ := list.partition (λ x, equ h x) t in list.partition_many_aux non_eqs (eqs :: acc)
+|[] acc := acc
 
+meta def list.partition_many {α} (equ : α → α → bool) : list α → list (list α) := λ l, list.partition_many_aux equ l []
+
+def list.choose {α β} (f : α → option β) : list α → list β := list.reverse ∘ list.foldl (λ acc h, option.rec_on (f h) acc (λ b, b::acc)) []
+def list.ohead {α} : list α → option α |(h::t) := some h | [] := none
+def list.take1 {α} : list α → list α |(h::_) := [h] | [] := []
 
 private def map_with_rest_aux (m : α → list α → β) : list α → list α → list β → list β
 | left [] acc := acc.reverse
