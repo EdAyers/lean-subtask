@@ -5,10 +5,24 @@ meta structure hyp :=
 (n : name) (bi : binder_info) (type : expr)
 meta def telescope := list hyp
 meta def telescope.to_pis : expr → telescope → expr := list.foldl (λ e ⟨n,b,y⟩, expr.pi n b y e)
+meta def telescope.to_lambdas : expr → telescope → expr := list.foldl (λ e ⟨n,b,y⟩, expr.lam n b y e)
 private meta def telescope.of_pis_aux : telescope → expr → telescope × expr
 | acc (expr.pi n bi y b) := telescope.of_pis_aux (⟨n,bi,y⟩::acc) b
 | acc x := ⟨acc,x⟩
 meta def telescope.of_pis : expr → (telescope × expr) := telescope.of_pis_aux []
+
+meta def telescope.to_pattern_core : expr → tactic (expr × list expr)
+|(expr.lam n bi y b) := do
+   un        ← mk_fresh_name,
+   let x     := expr.local_const un n bi b,
+   let b := expr.instantiate_var b x,
+   (p, xs) ← telescope.to_pattern_core b,
+   return (p, x::xs)
+|x := pure (x, [])
+
+meta def telescope.to_pattern (t : telescope) (e : expr) : tactic pattern := do
+    (e,xs) ← telescope.to_pattern_core $ telescope.to_lambdas e t,
+    mk_pattern [] xs e [] xs
 
 @[derive decidable_eq]
 meta structure rule := -- relation is always `=` for now.
@@ -93,6 +107,8 @@ namespace rule
         infer_type pf, -- make sure it's valid
         of_prf pf
 
+
+    meta def lhs_pattern (r : rule) : tactic pattern := telescope.to_pattern r.ctxt r.lhs
 
     meta def to_mvars (r : rule) : tactic (rule × list expr) := do
         gs ← get_goals,

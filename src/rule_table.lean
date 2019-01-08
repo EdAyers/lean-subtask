@@ -32,11 +32,33 @@ namespace submatch
     --     ms ← ms.mmap instantiate_mvars,
     --     set_goals gs,
     --     rule.of_prf $ expr.mk_app r.pf ms.reverse
+
+    -- [BUG] run and run_app are setting metavariables in the global tactic state.
+    -- This is a common problem that I have; I want to be able to take 
+    meta def run_app : expr → submatch → tactic rule
+    | e ⟨r,z⟩ := do
+
+        (expr.app f a) ← pure e,
+        (mrule, ms) ← rule.to_mvars r,
+        if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
+        current@(expr.app f₂ a₂) ← pure $ expr.instantiate_vars z.current $ ms.reverse,
+        -- current ← instantiate_mvars current,
+        -- trace_m "submatch.run_app: " $ (e, z),
+        unify f₂ f,
+        unify a₂ a,
+        --trace_state,
+        mrule.instantiate_mvars
+
+    
     meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do
+        --e ← instantiate_mvars e,
         (mrule, ms) ← rule.to_mvars r,
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         let current := expr.instantiate_vars z.current $ ms.reverse,
-        unify e current,
+        current ← instantiate_mvars current,
+        --trace_m "submatch.run: " $ current,
+        unify current e, -- [TODO] for some reason this can't unify `A ?m_1` and `?m_2 ?m_3`?
+        --trace_state,
         mrule.instantiate_mvars
         
     meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
@@ -51,8 +73,7 @@ namespace rule_table
     meta def empty : rule_table := {head_table := ∅, submatch_table := ∅}
 
     meta def get_key : expr → name
-    |(expr.app (expr.var f) a) := `rule_table.app
-    |(expr.app f a) := get_key f
+    |(expr.app f a) := if f.is_var || f.is_mvar || f.is_local_constant then `rule_table.app else get_key f
     |(expr.const n _) := n
     |(expr.var n) := `rule_table.wildcard
     |e := `rule_table.default
@@ -64,7 +85,9 @@ namespace rule_table
         pure { head_table := tabledict.insert (get_key r.lhs) r ht
              , submatch_table :=  st
              }
+    /-- Take each rule in r₁ and insert to r₂. -/
     meta def join (r₁ r₂ : rule_table) : tactic rule_table := tabledict.mfold (λ rt _ r, insert r rt) r₂ $ head_table $ r₁
+    meta def joins (l : list rule_table) :tactic rule_table := list.mfoldl (λ acc rt, join rt acc) (rule_table.empty) l
     meta def of_rules : list rule → tactic rule_table := list.mfoldl (function.swap insert) empty
 
     meta def of_names (ns : list name) : tactic rule_table := do
@@ -108,8 +131,13 @@ namespace rule_table
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
     /--`submatch e rt` finds rules such that the rhs of the rule contains `e`-/
-    meta def submatch : expr → rule_table → tactic (list rule) | e rt :=
-        list.mcollect (robot.submatch.run e) $ rt.submatch_table.get $ get_key e
+    meta def submatch : expr → rule_table → (tactic (list rule)) | e rt :=
+        let key := get_key e in
+        let submatches := rt.submatch_table.get key in
+        if (key = `rule_table.app ) then list.mcollect (robot.submatch.run_app e) submatches
+        else 
+        -- trace_m "submatch: " $ submatches,
+        list.mcollect (robot.submatch.run e) submatches
 
 end rule_table
 

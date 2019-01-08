@@ -287,14 +287,29 @@ namespace zipper
             else pure (zippers, z')) (([] : list zipper), z),
         pure (f,zippers)
 
-    meta def traverse {α} (f : α → zipper → tactic α) : α → zipper → tactic α
-    | a z := do a ← f a z, z.children.mfoldl traverse a
+    meta def fold {α} (f : α → zipper → tactic α) : α → zipper → tactic α
+    | a z := do a ← f a z, z.children.mfoldl fold a
+
+    meta def traverse {α} (f : α → zipper → tactic ( α × zipper)) : (α × zipper) → tactic (α × zipper)
+    | (a,z) := do (a,z) ← f a z <|> pure (a,z),
+        match down z with
+        |down_result.terminal := pure (a,z)
+        |(down_result.app f x) := do (a,zf) ← traverse (a,f), (a,zx) ← traverse (a,x), z ← up zx, z ← pure $ set_current (expr.app zf.current zx.current) z, pure (a,z)
+        |(down_result.lam _ _ _ _) := notimpl
+        |(down_result.pi _ _ _ _) := notimpl
+        |(down_result.elet _ _ _ _) := notimpl
+        end
+
+    meta def down_app_right : zipper → option zipper := λ z, match down z with
+    |(down_result.app _ x) := some x
+    |_ := none
+    end
 
     /--Traverse all of zipper.current. If `f` fails, then that branch is skipped.-/
     meta def traverse_proper {α} (f : α →  zipper → tactic α) : α → zipper → tactic α
     |a z := (do
         a ← f a z,
-        zpp ← pp z,
+        --zpp ← pp z,
         --trace $ ("traverse " : format) ++ zpp,
         (_,children) ← down_proper z,
         children.mfoldl traverse_proper a)
@@ -347,6 +362,20 @@ namespace zipper
 
     meta def largest_common_subterms (z₁ : zipper) (z₂ : zipper) : tactic (list zipper) :=
         list.join <$> z₁.maximal_monotone (λ z₁, if z₁.is_mvar then failure else do ocs ← find_occurences (z₂) z₁.current, if ocs.empty then failure else pure ocs) 
+
+    private meta def count_symbols_aux : table expr → zipper → tactic (table expr)
+    | acc z := do
+        (f,zs) ← down_proper z,
+        if expr.is_mvar f then pure acc else
+        zs.mfoldl count_symbols_aux $ table.insert f acc
+
+    meta def count_symbols : expr → tactic (table expr) := count_symbols_aux ∅ ∘ zip
+
+    -- meta def clone_mvars : zipper → tactic (zipper)
+    -- |z := do 
+    --     (a,z) ← zipper.traverse (λ (t:dict name expr) z, _) (∅,z) ,
+    --     sorry
+
 
     -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
     --     hypothetically (do

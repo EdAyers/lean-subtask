@@ -6,12 +6,20 @@ universes u v
 section
 variables {α : Type u} {β : Type v}
 
+/-- This code is yet to be implemented. -/
 meta def notimpl : α := undefined_core "not implemented"
 
+def list.skip {α} : ℕ → list α → list α
+|0 l := l
+|(n+1) [] := []
+|(n+1) (h::t) := list.skip n t
 
+def list.maxidx {α} (f : α → int) (l : list α) : option nat :=
+    let o := list.foldl (λ (a : ℕ × option (ℕ×ℤ)) x, let m := f x in prod.mk (a.1 + 1) $ ((a.2 <|> some ⟨a.1,m⟩) >>= (λ p, if m < p.2 then a.2 else some ⟨a.1,m⟩ ))) (0,none) l
+    in prod.fst <$> prod.snd o
+/-- Find the maximum according to the given function. -/
 def list.maxby {α} (f : α → int) (l : list α) : option α := 
-prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.rec_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
-
+prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.cases_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
 
 meta def new_goal : option expr → tactic expr
 |none := mk_mvar
@@ -76,6 +84,12 @@ meta def expr.binding_body_all : expr → option expr
 |(expr.elet _ _ _ b) :=some b
 |_ := none
 
+meta def expr.mfold2  {T} [monad T] [alternative T]  {α} (f : expr → expr → α → T α) : expr → expr → α → T α :=
+λ e₁ e₂ a, f e₁ e₂ a <|> match e₁, e₂ with
+|(expr.app f₁ a₁), (expr.app f₂ a₂) := expr.mfold2 f₁ f₂ a >>= expr.mfold2 a₁ a₂
+|_,_ := if e₁ = e₂ then pure a else failure -- [TODO] not implemented. 
+ end
+
 meta def list_local_consts (e : expr) : list expr :=
 e.fold [] (λ e' _ es, if e'.is_local_constant then insert e' es else es)
 
@@ -88,6 +102,8 @@ def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β
 |(h::t) := pure (λ fh rest, option.cases_on fh rest (λ fh,fh::rest)) 
             <*> (some <$> f h <|> pure none) 
             <*> list.mcollect t
+
+
 
 private def map_with_rest_aux (m : α → list α → β) : list α → list α → list β → list β
 | left [] acc := acc.reverse

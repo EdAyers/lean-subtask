@@ -52,9 +52,8 @@ namespace tests
 
         def is_hom {G H : Type u} [group G] [group H] (f : G → H) := ∀ x y, f (x * y) = f x * f y
         
-
         open tactic
--- set_option pp.all true
+        -- set_option pp.all true
         
         meta def rules := rule_table.of_names [``A,`NL,`NR,`IR,`IL]
         -- test submatches
@@ -84,8 +83,6 @@ namespace tests
             --trace ls,
             skip
         )
-
-
 
     end group_theory
 
@@ -135,28 +132,58 @@ namespace tests
         def A11 : A ∩ ∅ = ∅ := ext $ λ _, and_false _
         def A12 : A ∪ set.univ = set.univ := ext $ λ _, or_true _
         def A13 : A ∩ set.univ = A := ext $ λ _, and_true _
+        def A14 : A ∩ A = A := ext $ λ a, ⟨λ ⟨x,y⟩, x, λ x, ⟨x,x⟩⟩
+        def A15 : A ∪ A = A := ext $ λ a, ⟨λ xy, or.rec_on xy id id, or.inl⟩
         meta def rules := rule_table.of_names [
             ``A1, ``A2, ``A3, ``A4, ``A5, ``A6, ``A7, ``A8, ``A9
-            , ``A10, ``A11, ``A12, ``A13 
+            , ``A10, ``A11, ``A12, ``A13, ``A14, ``A15
         ]
     end set_rules
+    namespace list_theory
+        universe u
+        open list
+        variables {α : Type u} {a h : α} {l t : list α}
+        def nil_append : [] ++ l = l := rfl
+        def append_cons : (h::t) ++ l = h:: (t ++ l) := rfl
+        def rev_nil : reverse ([] : list α) = [] := rfl
+        def append_nil : l ++ [] = l := begin induction l, refl, simp end
+        #print list.reverse_core._main
+        -- [HACK] taken from mathlib
+        theorem rev_cons (a : α) (l : list α) : reverse (a::l) = reverse l ++ [a] := 
+        begin
+                have aux : ∀ l₁ l₂, reverse_core l₁ l₂ ++ [a] = reverse_core l₁ (l₂ ++ [a]),
+                intro l₁, induction l₁, intros, refl,
+                intro, 
+                simp only [*, reverse_core, cons_append], 
+                symmetry, apply aux
+        end
 
+        meta def rules := rule_table.of_names [``append_nil, ``append_cons, ``rev_nil, ``rev_cons, ``nil_append]
+
+    end list_theory
 
     namespace vector_theory
         universes u
-        variables {k : Type u} [field k] {μ ν : k}
-        variables {V : Type u} [add_comm_group V] {x y z : V}
 
-        class has_scalar_prod (k : Type u) (V : Type u) :=
-        (scalar_prod : k → V → V)
-        infixr ` • `:100 := has_scalar_prod.scalar_prod
+        -- variables {k : Type u} [field k] {μ ν : k}
+        -- variables {V : Type u} [add_comm_group V] {x y z : V}
+
+        -- class has_scalar_prod (k : Type u) (V : Type u) :=
+        -- (scalar_prod : k → V → V)
+        -- infixr ` • `:100 := has_scalar_prod.scalar_prod
         
-        class vector_space (k : Type u) [field k] (V : Type u) [add_comm_group V] extends has_scalar_prod k V :=
-        (scalar_dist {μ : k} {x y : V} : μ • (x + y) = μ • x + μ • y)
-        (scalar_dist {μ \nu: k} {x : V} : μ • (x + y) = μ • x + μ • y)
-        (scalar_mul {μ ν : k} {x : V} : (μ * ν) • x = μ • ν • x)
+        -- class vector_space (k : Type u) [field k] (V : Type u) [add_comm_group V] extends has_scalar_prod k V :=
+        -- (scalar_dist {μ : k} {x y : V} : μ • (x + y) = μ • x + μ • y)
+        -- (scalar_dist {μ ν: k} {x : V} : μ • (x + y) = μ • x + μ • y)
+        -- (scalar_mul {μ ν : k} {x : V} : (μ * ν) • x = μ • ν • x)
 
 
+        constant k : Type
+        constant V : Type
+        constant k_f : field k
+        noncomputable instance : field k := k_f
+        constant V_ac : add_comm_group V
+        noncomputable instance : add_comm_group V := V_ac
 
         constant p : k → V → V
         infixr ` • `: 100 := p
@@ -164,8 +191,8 @@ namespace tests
         constant adj : (V → V) → (V → V)
         variables {μ ν : k} {x y z : V} {A : V → V}
         postfix `†`:200 := adj
-        axiom L1 : is_linear A → A (x + y) = A x + A y
-        axiom L2 : is_linear A → μ • A x = A (μ • x)
+        axiom L1 {A : V → V} : is_linear A → A (x + y) = A x + A y
+        axiom L2 {A : V → V}: is_linear A → μ • A x = A (μ • x)
         axiom SS : μ • ν • x = (μ * ν) • x
         axiom LL : μ • (x + y) = μ • x + μ • y
         constant ip : V → V → k
@@ -180,12 +207,13 @@ namespace tests
             ``L1, ``L2,``SS, ``LL, ``ipL, ``ipR,``ipSL,``ipSR,``ADJ,
             ``COMP_DEF
             ]
-        meta def rules : tactic rule_table := do
-            rt₁ ← rule_table.of_names rulenames,
-            rt₂ ← ring_theory.rules,
-            rt₃ ← set_rules.rules,
-            rt ← rule_table.join rt₁ rt₂,
-            rule_table.join rt rt₃
+        /-- [TODO] is there a way to cache this? -/
+        meta def rules : tactic rule_table :=
+            [rule_table.of_names rulenames, 
+             ring_theory.rules, 
+             set_rules.rules, 
+             list_theory.rules
+            ].mfoldl (λ acc rt, rt >>= λ rt, rule_table.join rt acc) (rule_table.empty)
 
         open tactic
         open ez.zipper
@@ -202,19 +230,25 @@ namespace tests
 
         run_cmd rules >>= trace
 
-
-
-
     end vector_theory
     
-    meta def equate := vector_theory.rules >>= robot.run robot.score_policy
+    meta def equate (names : list name := []) := do
+        base ← vector_theory.rules,
+        bonus ← rule_table.of_names names,
+        all ← rule_table.join bonus base,
+        robot.run robot.score_policy all
 
 
     section
         universe u
-        variables {A : V → V} {x y z : V}
-        example (il : is_linear A) : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
-        by equate
+        open vector_theory
+        variables {A : V → V} {x y z u v w : V}
+        example (il : is_linear A) : ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := by equate
+        example : (x + y) + z = (z + x) + y := by equate 
+        example : (x + y) + (z + w) = (x + z) + (y + w) := by equate
+        example (il : is_linear A) : 
+            ⟪(A† (u + v)) + w, x⟫ = ⟪A† u + A† v + w, x⟫ := by equate
+            -- [TODO] this breaks because of a bug in submatch.run, it should be able to do this. 
     end
     section
         universe u
@@ -233,6 +267,32 @@ namespace tests
         example : ( X - B ) - C = X - ( B ∪ C ) := by equate
         example : X - ( B ∪ C ) = ( X - B ) - C := by equate
     end
+
+    section
+        universe u
+        open list
+        variables  {α : Type u} {l s t : list α} {a b c : α}
+        lemma assoc : (l ++ s) ++ t = l ++ (s ++ t) :=
+        begin
+            induction l with lh lt,
+            equate, -- irl would just do simp [*] for these.
+            equate
+        end
+        open list_theory
+        lemma rev_app_rev : reverse (l ++ s) = reverse s ++ reverse l :=
+        begin
+            induction l,
+            symmetry, equate, -- [TODO] equate should try reverse direction too.
+            equate [``assoc]  -- [TODO] assoc should be added to the rule_table with an attribute.
+        end
+        /- Compare the above with mathlib version:
+            @[simp] theorem reverse_append (s t : list α) : reverse (s ++ t) = (reverse t) ++ (reverse s) :=
+            by induction s; [rw [nil_append, reverse_nil, append_nil],
+            simp only [*, cons_append, reverse_cons, append_assoc]]
+         -/
+    end
+
+
 
 end tests
 
