@@ -348,10 +348,7 @@ namespace zipper
         --trace_state, trace r,
         try $ all_goals $ apply_instance <|> prop_assumption,
         pure ()
-
-
     
-
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
