@@ -463,6 +463,8 @@ meta def score_strategy : strategy → M int
 |(strategy.ReduceDistance a b) := pure 0
 |(strategy.Use r) := score_rule r
 
+/- Refine to ReduceDistance when the children of the given term are all present in the expression. -/
+
 meta def score_policy : policy
 |[] := failure
 |l  := do
@@ -523,7 +525,7 @@ meta def run_aux (π : policy) : state → list action → nat → conv unit
             pure As
         ) s,
         run_aux s As n
-        <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
+        -- <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
     )
 
 /--Add all of the rules which appear in the local context. -/

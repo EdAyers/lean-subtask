@@ -92,11 +92,13 @@ namespace add_grp_theory
     def A1 : (x + y) + z = x + (y + z) := by apply add_assoc
     def A2L : - x + x = 0 := by apply add_left_neg
     def A2R : x + - x = 0 := by apply add_right_neg
+    def A2SS : x - y = x + - y := by simp
+    def AIM : - (x + y) = (-x + - y) := by simp
     def A3L : 0 + x = x := by apply zero_add
     def A3R : x + 0 = x := by apply add_zero
     def A4 : x + y = y + x := by apply add_comm
     def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
-    meta def rules := rule_table.of_names [ ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4]
+    meta def rules := rule_table.of_names [ ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4, ``A2SS, ``AIM]
 end add_grp_theory
 
 namespace ring_theory
@@ -106,10 +108,12 @@ namespace ring_theory
     def M3L : 1 * x = x := by apply one_mul
     def M3R : x * 1 = x := by apply mul_one
     def M4 : x * y = y * x := by apply mul_comm
+    def S1 : (- x) * y = - (x * y) := sorry
+    def S2 : x * -y = - (x * y) := sorry
     def D1 : x * (y + z) = (x * y) + (x * z) := by apply left_distrib
     def D2 : (y + z) * x = y * x + z * x := by apply right_distrib
     meta def rules : tactic rule_table := do r1 ← rule_table.of_names [
-        ``M1, ``M3L, ``M3R, ``M4, ``D1, ``D2
+        ``M1, ``M3L, ``M3R, ``M4, ``D1, ``D2, ``S1, ``S2
     ], r2 ← add_grp_theory.rules, rule_table.join r1 r2
 end ring_theory
 
@@ -236,13 +240,20 @@ meta def equate (names : list name := []) := do
     base ← vector_theory.rules,
     bonus ← rule_table.of_names names,
     all ← rule_table.join bonus base,
-    robot.run robot.score_policy all
+    tactic.timetac "equate" $ robot.run robot.score_policy all
 
 section
 universe u
 open vector_theory
-variables {A B : V → V} {x y z u v w : V} {μ ν: k}
+variables {A B : V → V} {x y z u v w : V} {μ ν: k} {a b c d e : k}
 example : (x + y) + z = (z + x) + y := 
+by equate 
+example : (a * -d - b * -c) * e = -((a * d - b * c) * e) := by equate
+example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
+by equate 
+example : a * b + b * c = (a +c) * b := 
+by equate 
+example : (a + c) * b = a * b + b * c := 
 by equate 
 example : (x + y) + (z + w) = (x + z) + (y + w) := 
 by equate
@@ -269,6 +280,7 @@ section
         : ψ (x * y) = ψ x * ψ y :=
     by equate
 end
+-- set_option pp.notation false
 section
     universe u
     variables {α : Type u} {X B C : set α}
@@ -296,7 +308,7 @@ section
     lemma rev_app_rev : reverse (l ++ s) = reverse s ++ reverse l :=
     begin
         induction l,
-        symmetry, equate, 
+        symmetry, equate, -- [HACK] can I get this to work?
         equate [``assoc]  
     end
     /- Compare the above with mathlib version:
