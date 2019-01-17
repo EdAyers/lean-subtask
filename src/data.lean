@@ -181,7 +181,8 @@ meta def stack.mfold_achieved {T} [monad T] {α} (f : α → task → T α) : α
 -- meta def mfold_achieved {α} (f : α → task → M α) : α → M α | a := get_stack >>= stack.mfold_achieved f a
 
 meta def refinement := list task × list strategy
-
+meta def refinement.empty : refinement := ([],[])
+meta def refinement.of_strategy (s : strategy) : refinement := ([],[s])
 meta def task.test : expr → task → M bool
 |ce (task.Create e) := do
     e ← instantiate_mvars e,
@@ -225,31 +226,55 @@ meta def try_dioms : task → M refinement | t := do
     --trace dioms,
     if ¬ dioms.empty then pure ([],dioms) else failure
 
+meta def can_use_ReduceDistance : expr → M strategy := λ e, (do
+    [a,b] ← zipper.get_proper_children e | failure,
+    ce ← get_ce,
+    za ← zipper.find_subterm a $ zipper.zip ce,
+    zb ← zipper.find_subterm b $ zipper.zip ce,
+
+    (zipper.get_distance ce a b *> trace "using reduce distance" *>  (pure $ ReduceDistance a b))
+
+    )
+
+
 meta def task.refine (t : task) : M refinement :=
 try_dioms t <|>
 match t with
 |(task.Create e) := do
+    rss ← (list.singleton <$> can_use_ReduceDistance e) <|> pure [],
+    -- trace_m "task.refine: " $ rss,
     ce ← get_ce,
     rt ← get_rule_table,
     submatches ← rt.submatch e,
     -- trace_m "task.refine: " $ submatches,
     strats ← list.mmap strategy.of_rule $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
-    pure $ ([],strats)
+    pure $ ([],rss ++ strats)
 |(task.CreateAll a) := do
-    ce ← get_ce,
-    -- tactic.trace "refine CreateAll",
+    ce ← get_ce >>= lift instantiate_mvars,
+    -- trace_m "refine CreateAll: " $ ce,
     scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
+    -- trace_m "refine CreateAll: " $ scs,
     if scs.length = 0 then notimpl else do
     let scs := task.Create <$> zipper.current <$> scs,
     pure $ (scs, [])
 end
 
-meta def strategy.execute : strategy → conv unit
-|(strategy.ReduceDistance a b) := notimpl
+
+
+meta def strategy.execute : strategy → M unit
+|(strategy.ReduceDistance a b) := do
+    ce ← get_ce,
+    current_dist ← zipper.get_distance ce a b,
+    rs ← get_lookahead,
+    rs.mfirst (λ r, do
+        let outer := r.rhs,
+        new_dist ← zipper.get_distance outer a b,
+        if new_dist < current_dist then zipper.rewrite_conv r else failure
+    )
 |s@(strategy.Use r)              := zipper.rewrite_conv r
 open tactic
 meta def strategy.refine : strategy → M refinement
-|(strategy.ReduceDistance a b) := notimpl
+|(strategy.ReduceDistance a b) := pure $ refinement.empty
 |(strategy.Use r)              := do
     ce ← get_ce,
     ⟨r,ms⟩ ← rule.to_mvars r,
@@ -310,7 +335,7 @@ meta def explore_tasks (depth : nat) : list (task × stack) → list action → 
     ce ← get_ce,
     is_achieved ← task.test ce t,
     ppt ← pp t,
-    tactic.trace $  indent_by (st.length - depth) $ ppt,
+    tactic.trace $ indent_by (st.length - depth) $ ppt,
     if is_achieved then explore_tasks rest acc else do
     (subtasks, substrats) ← task.refine t,
     -- pp_st ← pp subtasks, pp_ss ← pp substrats,
@@ -355,13 +380,12 @@ meta def trace_done_path : M unit := do
     r ← (rest ++ path).reverse.mmap (λ x, tactic.pp x),
     trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
 
-
 meta def execute_strategy : strategy → stack → M unit
 |s rest := do
     state ← get,
     ce ← get_ce,
     --trace_m "execute_strategy: " $ s,
-    state_t.lift $ strategy.execute s,
+    strategy.execute s,
     ce' ← get_ce,
     when (ce = ce') (tactic.trace "strategy did not change the goal." *> failure),
     --trace_m "execute_strategy: " $ (list.tail rest),
@@ -411,6 +435,7 @@ meta def ascend : stack → M (list action)
         end
     else do 
         -- trace_m "ascend: not yet achieved " $ current,
+        --trace_m "ascend: " $ (siblings, achieved),
         explore_task (current, stack)
         
 meta def execute : action → M (list action)
@@ -492,11 +517,7 @@ meta def score_policy : policy
     [TODO] backtrack when there are lots of possible actions all with bad scores.
      -/ 
 
-    /- [TODO] general
-        - Implement ReduceDistance.
-        - It is too eager to perform commutativity. It scores higly because 
-    
-     -/
+/- [TODO] sort out backtracking. -/
 
 meta def backtrack : M (list action) := do
     trace "backtrack",
@@ -525,7 +546,7 @@ meta def run_aux (π : policy) : state → list action → nat → conv unit
             pure As
         ) s,
         run_aux s As n
-        -- <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
+         <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
     )
 
 /--Add all of the rules which appear in the local context. -/

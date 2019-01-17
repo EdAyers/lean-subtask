@@ -94,11 +94,16 @@ namespace add_grp_theory
     def A2R : x + - x = 0 := by apply add_right_neg
     def A2SS : x - y = x + - y := by simp
     def AIM : - (x + y) = (-x + - y) := by simp
+    def AIM2 : ( - x - - y) = - (x - y) := by simp
     def A3L : 0 + x = x := by apply zero_add
     def A3R : x + 0 = x := by apply add_zero
     def A4 : x + y = y + x := by apply add_comm
     def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
-    meta def rules := rule_table.of_names [ ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4, ``A2SS, ``AIM]
+    meta def rules := rule_table.of_names [ 
+        ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4, ``A2SS, 
+        ``AIM
+        -- ``AIM2
+        ]
 end add_grp_theory
 
 namespace ring_theory
@@ -108,8 +113,8 @@ namespace ring_theory
     def M3L : 1 * x = x := by apply one_mul
     def M3R : x * 1 = x := by apply mul_one
     def M4 : x * y = y * x := by apply mul_comm
-    def S1 : (- x) * y = - (x * y) := sorry
-    def S2 : x * -y = - (x * y) := sorry
+    def S1 : (- x) * y = - (x * y) := by simp
+    def S2 : x * -y = - (x * y) := by simp
     def D1 : x * (y + z) = (x * y) + (x * z) := by apply left_distrib
     def D2 : (y + z) * x = y * x + z * x := by apply right_distrib
     meta def rules : tactic rule_table := do r1 ← rule_table.of_names [
@@ -247,8 +252,10 @@ universe u
 open vector_theory
 variables {A B : V → V} {x y z u v w : V} {μ ν: k} {a b c d e : k}
 example : (x + y) + z = (z + x) + y := 
-by equate 
-example : (a * -d - b * -c) * e = -((a * d - b * c) * e) := by equate
+by equate -- [TODO] this should be really fast.
+--set_option pp.notation false
+example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
+by equate
 example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
 by equate 
 example : a * b + b * c = (a +c) * b := 

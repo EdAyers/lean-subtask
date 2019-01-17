@@ -85,7 +85,6 @@ namespace src
     --     pure (res, es)
     open tactic
 
-
     -- meta def revert_aux : list expr → expr → list src → tactic (expr × list src)
     -- |[] e acc := pure (e,acc)
     -- |((expr.local_const _ pn bi y)::rest) e acc := do
@@ -352,13 +351,19 @@ namespace zipper
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
-        if z.is_mvar || z.is_constant then failure else
-        -- [TODO] this should instead be l.zip.maximal_monotone (λ lz, z ⊎ lz)
-        -- I think that I'm going to have to stop worrying about creating tonnes of metavariables.
-        if expr.occurs z.current l then failure else pure z) z
+            if z.is_mvar || z.is_constant then failure else do 
+            let o := expr.occurs z.current l,
+            matches ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
+            -- trace_m "lus: " $ (z,l,o, matches),
+            if ¬ matches.empty then failure else pure z
+        ) z
 
-    meta def largest_common_subterms (z₁ : zipper) (z₂ : zipper) : tactic (list zipper) :=
-        list.join <$> z₁.maximal_monotone (λ z₁, if z₁.is_mvar then failure else do ocs ← find_occurences (z₂) z₁.current, if ocs.empty then failure else pure ocs) 
+    meta def largest_common_subterms (z₁ z₂ : zipper): tactic (list zipper) :=
+        list.join <$> z₁.maximal_monotone (λ z₁, 
+            if z₁.is_mvar then failure else do 
+            ocs ← find_occurences (z₂) z₁.current, 
+            if ocs.empty then failure else pure ocs
+        ) 
 
     private meta def count_symbols_aux : table expr → zipper → tactic (table expr)
     | acc z := do
@@ -367,6 +372,42 @@ namespace zipper
         zs.mfoldl count_symbols_aux $ table.insert f acc
 
     meta def count_symbols : expr → tactic (table expr) := count_symbols_aux ∅ ∘ zip
+
+    meta def find_subterm (e : expr) : zipper → tactic zipper
+    |z :=
+        if z.is_mvar then failure else
+        (hypothetically' $ unify e z.current *> pure z)
+        <|> do 
+            (_,zs) ← down_proper z,
+            list.mfirst find_subterm zs
+
+    meta def distance_to_subterm_down (e : expr) : zipper → nat → tactic nat
+    |z d :=
+        if z.is_mvar then failure else
+        (hypothetically' $ unify e z.current *> pure d)
+        <|> do
+            (_,zs) ← down_proper z,
+            zs.with_indices.mfirst (λ iz, distance_to_subterm_down iz.2 $ iz.1 + d)
+
+    meta def is_app_right : zipper → bool
+    |⟨(path.app_right _ _)::t,_,_⟩ := tt
+    |_ := ff
+
+    meta def right : zipper → option zipper
+    |z := if is_app_right z then up z >>= right else up z >>= app_right
+
+    meta def distance_to_subterm_up (e : expr) : ℕ → zipper → tactic ℕ
+    |d z := do
+        z ← right z,
+        distance_to_subterm_down e z (d+1) 
+        <|> distance_to_subterm_up (d+1) z
+
+    meta def get_distance (outer : expr) (l : expr) (r : expr) : tactic ℕ :=
+        find_subterm l (zip outer) >>= distance_to_subterm_up r 0
+
+    meta def get_proper_children (e : expr) : tactic (list expr) := do
+        e ← instantiate_mvars e,
+        (list.map current <$> prod.snd <$> (down_proper $ zip e)) <|> pure []
 
     -- meta def clone_mvars : zipper → tactic (zipper)
     -- |z := do 

@@ -21,6 +21,14 @@ def list.maxidx {α} (f : α → int) (l : list α) : option nat :=
 def list.maxby {α} (f : α → int) (l : list α) : option α := 
 prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.cases_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
 
+def list.singleton {α} : α → list α := λ a, [a]
+
+private def mapi_aux {α β} (f : ℕ → α → β) : ℕ →  list α → list β
+|_ [] := []
+|i (h::t) := (f i h) :: mapi_aux (i+1) t
+def list.mapi {α β} (f : ℕ → α → β) : list α → list β := mapi_aux f 0
+def list.with_indices {α} : list α → list (ℕ × α) := list.mapi prod.mk
+
 meta def new_goal : option expr → tactic expr
 |none := mk_mvar
 |(some e) := mk_meta_var e
