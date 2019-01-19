@@ -226,14 +226,28 @@ meta def try_dioms : task → M refinement | t := do
     --trace dioms,
     if ¬ dioms.empty then pure ([],dioms) else failure
 
+
+meta def get_distance_reducers : expr → expr → M (list rule)
+| a b := do
+    ce ← get_ce,
+    current_dist ← zipper.get_distance ce a b,
+    trace_m "\ngdr: " $ (ce, current_dist),
+    rs ← get_lookahead,
+    rs.mfilter (λ r, (do
+        new_dist ← zipper.get_distance r.rhs a b,
+        trace_m "gdr: " $ (r.rhs, new_dist),
+        pure $ new_dist < current_dist) <|> pure ff
+    )
+
 meta def can_use_ReduceDistance : expr → M strategy := λ e, (do
     [a,b] ← zipper.get_proper_children e | failure,
     ce ← get_ce,
     za ← zipper.find_subterm a $ zipper.zip ce,
     zb ← zipper.find_subterm b $ zipper.zip ce,
-
-    (zipper.get_distance ce a b *> trace "using reduce distance" *>  (pure $ ReduceDistance a b))
-
+    zipper.get_distance ce a b,
+    _::_ ← get_distance_reducers a b | failure,
+    trace_m "can_use_ReduceDistance" $ (a,b),
+    pure $ ReduceDistance a b
     )
 
 
@@ -259,19 +273,41 @@ match t with
     pure $ (scs, [])
 end
 
+meta def trace_path : M unit := do
+    ce ← get_ce,
+    -- ppce ← pp ce,
+    path ← get_path,
+    -- trace path
+    r ← (ce::path).reverse.mmap (λ x, tactic.pp x),
+    trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
+
+meta def repeat : M unit → M unit := λ t,
+    t *> (repeat t <|> pure ())
+
+meta def run_conv : conv unit → M unit := λ c, do
+    ce ← get_ce,
+    c,
+    ce' ← get_ce,
+    state ← get,
+    lookahead ← rule_table.rewrites ce' state.rt,
+
+    let path := ce :: state.path,
+    -- state_t.lift $ tactic.target >>= tactic.trace,
+    put {
+        state with
+         lookahead := lookahead
+        , path := path
+    }
 
 
 meta def strategy.execute : strategy → M unit
 |(strategy.ReduceDistance a b) := do
-    ce ← get_ce,
-    current_dist ← zipper.get_distance ce a b,
-    rs ← get_lookahead,
-    rs.mfirst (λ r, do
-        let outer := r.rhs,
-        new_dist ← zipper.get_distance outer a b,
-        if new_dist < current_dist then zipper.rewrite_conv r else failure
-    )
-|s@(strategy.Use r)              := zipper.rewrite_conv r
+    repeat (do 
+        h::_ ← get_distance_reducers a b | failure,
+        run_conv $ zipper.rewrite_conv h
+    ),
+    trace_path
+|s@(strategy.Use r)              := run_conv $ zipper.rewrite_conv r
 open tactic
 meta def strategy.refine : strategy → M refinement
 |(strategy.ReduceDistance a b) := pure $ refinement.empty
@@ -362,13 +398,6 @@ meta def explore : stack → M (list action)
 |s@((stack_entry.task t _ _) :: _) := explore_task (t,s)
 |s@((stack_entry.strategy t) :: _) := explore_strategy ⟨t,s⟩
 
-meta def trace_path : M unit := do
-    ce ← get_ce,
-    -- ppce ← pp ce,
-    path ← get_path,
-    -- trace path
-    r ← (ce::path).reverse.mmap (λ x, tactic.pp x),
-    trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
 
 meta def trace_done_path : M unit := do
     ce ← get_ce,
@@ -387,20 +416,14 @@ meta def execute_strategy : strategy → stack → M unit
     --trace_m "execute_strategy: " $ s,
     strategy.execute s,
     ce' ← get_ce,
-    when (ce = ce') (tactic.trace "strategy did not change the goal." *> failure),
+    path ← get_path,
+    when (ce' ∈ path.tail) (tactic.trace "strategy went through previously tried state." *> failure),
     --trace_m "execute_strategy: " $ (list.tail rest),
     stack.mfold_achieved (λ _ acheived, do 
         r ← acheived.test ce', 
         when (¬r) (tactic.trace "stategy caused a previously achieved task to fail." *> failure)
     ) () $ list.tail $ rest,
-    lookahead ← rule_table.rewrites ce' state.rt,
-    let path := ce :: state.path,
     -- state_t.lift $ tactic.target >>= tactic.trace,
-    put {
-        state with
-         lookahead := lookahead
-        , path := path
-    },
     when (path.length > 1) (do
         trace "current path:"
         trace_path, 
@@ -546,7 +569,7 @@ meta def run_aux (π : policy) : state → list action → nat → conv unit
             pure As
         ) s,
         run_aux s As n
-         <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
+        -- <|> (do (As,s) ← state_t.run backtrack s, run_aux s As (n / 2)) 
     )
 
 /--Add all of the rules which appear in the local context. -/

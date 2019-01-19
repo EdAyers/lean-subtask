@@ -387,7 +387,7 @@ namespace zipper
         (hypothetically' $ unify e z.current *> pure d)
         <|> do
             (_,zs) ← down_proper z,
-            zs.with_indices.mfirst (λ iz, distance_to_subterm_down iz.2 $ iz.1 + d)
+            zs.with_indices.mfirst (λ iz, distance_to_subterm_down iz.2 $ iz.1 + d + 1)
 
     meta def is_app_right : zipper → bool
     |⟨(path.app_right _ _)::t,_,_⟩ := tt
@@ -397,8 +397,9 @@ namespace zipper
     |z := if is_app_right z then up z >>= right else up z >>= app_right
 
     meta def distance_to_subterm_up (e : expr) : ℕ → zipper → tactic ℕ
-    |d z := do
-        z ← right z,
+    |d z :=
+        if is_app_right z then up z >>= distance_to_subterm_up (d+1) else do
+        z ← up z >>= lift app_right,
         distance_to_subterm_down e z (d+1) 
         <|> distance_to_subterm_up (d+1) z
 

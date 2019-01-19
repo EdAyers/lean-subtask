@@ -101,8 +101,8 @@ namespace add_grp_theory
     def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
     meta def rules := rule_table.of_names [ 
         ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4, ``A2SS, 
-        ``AIM
-        -- ``AIM2
+        ``AIM,
+        ``AIM2
         ]
 end add_grp_theory
 
@@ -258,7 +258,7 @@ example : (a * -d - b * - c) * e = -((a * d - b * c) * e) :=
 by equate
 example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
 by equate 
-example : a * b + b * c = (a +c) * b := 
+example : a * b + b * c = (a + c) * b := 
 by equate 
 example : (a + c) * b = a * b + b * c := 
 by equate 
@@ -266,7 +266,7 @@ example : (x + y) + (z + w) = (x + z) + (y + w) :=
 by equate
 example (il : is_linear A) :
     μ • A (x) + ν • A (y) = A (μ • x + ν • y)  :=
-by equate
+by equate 
 example (il : is_linear A) : 
     ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
 by equate
