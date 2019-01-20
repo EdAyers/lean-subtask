@@ -23,6 +23,9 @@ prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.ca
 
 def list.singleton {α} : α → list α := λ a, [a]
 
+meta def option.repeat {α} (f : α → option α) : α → α
+|a := option.get_or_else (option.repeat <$> f a) a
+
 private def mapi_aux {α β} (f : ℕ → α → β) : ℕ →  list α → list β
 |_ [] := []
 |i (h::t) := (f i h) :: mapi_aux (i+1) t

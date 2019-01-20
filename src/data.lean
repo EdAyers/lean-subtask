@@ -8,47 +8,6 @@ section equiv
     def equiv : α → α → Prop := λ x y, ¬(x<y) ∧ ¬(y < x)
     instance dec_equiv [decidable_rel ((<) : α → α → Prop)] : decidable_rel (equiv : α → α → Prop) := λ x y, dite (x < y) (λ h, is_false (λ ⟨g,_⟩, absurd h g)) (λ h, dite (y < x) (λ h₂, is_false (λ ⟨_,g⟩, absurd h₂ g)) (λ h₂, is_true ⟨h,h₂⟩))
 end equiv
-@[derive decidable_eq]
-meta inductive task : Type
-|CreateAll : expr → task
-|Create : expr → task
-open task
-namespace task
-    meta def code : task → ℕ
-    |(Create _) := 0
-    |(CreateAll _) := 1
-    meta def lt : task → task → bool
-    |(Create e₁) (Create e₂) := e₁ < e₂
-    |(CreateAll e₁) (CreateAll e₂) := e₁ < e₂
-    |x y := code x < code y
-    meta instance has_lt : has_lt task := ⟨λ x y, lt x y⟩
-    meta instance decidable_lt : decidable_rel ((<) : task → task → Prop) := by apply_instance
-    meta instance : has_to_tactic_format task := ⟨λ t, match t with
-    |(Create x) := pure ((++) "Create ") <*> tactic.pp x
-    |(CreateAll x) := pure (λ x, "CreateAll " ++ x) <*> tactic.pp x
-    end⟩
-end task
-@[derive decidable_eq]
-meta inductive strategy : Type
-|Use : rule → strategy
-|ReduceDistance : expr → expr → strategy
-open strategy
-namespace strategy
-    meta def code : strategy → ℕ
-    |(Use _) := 0
-    |(ReduceDistance _ _) := 1
-    meta def lt : strategy → strategy → bool
-    |(Use r₁) (Use r₂) := r₁ < r₂
-    |(ReduceDistance a b) (ReduceDistance a' b') := (a,b) < (a',b')
-    |s₁ s₂ := s₁.code < s₂.code
-    meta instance has_lt : has_lt strategy := ⟨λ x y, lt x y⟩
-    meta instance decidable_lt : decidable_rel ((<) : strategy → strategy → Prop) := by apply_instance
-    meta instance : has_to_tactic_format robot.strategy := 
-    ⟨λ s, match s with
-        | (Use x) := do x ← tactic.pp x, pure $ "Use " ++ x
-        | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
-    end⟩
-end strategy
 
 -- @[derive decidable_eq]
 meta inductive stack_entry : Type
@@ -81,7 +40,6 @@ end stack
 meta inductive task_tree 
 |branch (t : task) (children : list task_tree) : task_tree
 |leaf (s : strategy) : task_tree
-
 
 meta structure action :=
 (strategy : strategy)
@@ -196,7 +154,13 @@ meta def task.test : expr → task → M bool
     o ← hypothetically (unify e ce), 
     pure o.is_some
 meta def strategy.of_rule : rule → M strategy := λ r, pure $ strategy.Use $ r
-
+meta def strategy.merge : strategy → strategy → M strategy
+|(Use r₁) (Use r₂) := do
+    unify r₁.lhs r₂.lhs,
+    unify r₁.rhs r₂.rhs, 
+    r ← rule.instantiate_mvars r₁,
+    pure $ Use r
+|_ _ := failure
 /-- Do In One Move. Check the lookahead table and see if any of the entries in there cause the task to be achieved. -/
 meta def task.diom : task → M (list strategy) := λ t, do
     ce ← get_ce,
@@ -323,7 +287,6 @@ meta def strategy.refine : strategy → M refinement
     let subs := subs.map (λ z, task.Create $ z.current),
     pure ⟨subs, []⟩
 
-
 meta def stack.append_substrats : list strategy → stack → list action
 |ss stack := ss.map(λ s, ⟨s,stack_entry.strategy s :: stack⟩)
 meta def stack.has_task : stack → task → bool
@@ -336,7 +299,7 @@ meta def equal_up_to_mvars (e₁ e₂ : expr) : bool
 end
 ) e₁ e₂ (∅ : dict name name)  in option.is_some o
 
-
+/-- Check if two strategies are 'effectively equal'.-/
 meta def strategy.equiv : strategy → strategy → bool
 |(strategy.Use r₁) (strategy.Use r₂) :=
     (equal_up_to_mvars r₁.lhs r₂.lhs)
