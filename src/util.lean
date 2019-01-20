@@ -78,7 +78,7 @@ meta def tactic.hypothetically' {α} (tac : tactic α) : tactic α :=
 |(success a _) := success a s
 |(exception ms pos _) := exception ms pos s
 end
-
+/-- `trace_m x y` is an alias for `((++) x) <$> pp y >>= trace` -/
 meta def tactic.trace_m {α} [has_to_tactic_format α]: string → α → tactic unit |s a := do ppa ← tactic.pp a, trace $ (to_fmt s) ++ ppa
 
 meta def tactic.try_first {α} : list (tactic α) → tactic α

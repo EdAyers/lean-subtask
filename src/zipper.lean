@@ -373,10 +373,16 @@ namespace zipper
 
     meta def count_symbols : expr → tactic (table expr) := count_symbols_aux ∅ ∘ zip
 
+    meta def does_unify (e : expr) : zipper → tactic unit
+    | z := if z.is_mvar then failure else
+        (hypothetically' $ unify e z.current)
+
+    meta def find_subterms (e : expr) : zipper → tactic (list zipper)
+    := traverse_proper (λ acc z, (does_unify e z *> pure (z::acc)) <|> pure acc) []
+
     meta def find_subterm (e : expr) : zipper → tactic zipper
     |z :=
-        if z.is_mvar then failure else
-        (hypothetically' $ unify e z.current *> pure z)
+        (does_unify e z *> pure z)
         <|> do 
             (_,zs) ← down_proper z,
             list.mfirst find_subterm zs
