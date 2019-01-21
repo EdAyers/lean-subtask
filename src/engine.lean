@@ -2,11 +2,16 @@ import .data .refine
 namespace robot
 open tree.zipper tactic
 
-meta def has_task : Z → task → bool
-|z t := z.any_above $ λ x, match x with (tree_entry.task x _) := t = x | (tree_entry.strat s _ ) := ff end
-
-meta def has_strat : Z → strategy → bool
-|z t := z.any_above $ λ x, match x with (tree_entry.strat x _) := t = x | (tree_entry.task s _ ) := ff end
+meta def has_task : Z → task → tactic bool
+|z t := (bnot ∘ list.empty) <$> (z.above.mfilter $ tree_entry.is_eq (tree_entry.task t []))
+meta def has_strat : Z → strategy → tactic bool
+|z (strategy.Use r) := (bnot ∘ list.empty) <$> 
+    (z.above.mfilter $ ( λ x, match x with
+        |(tree_entry.strat (strategy.Use r₂) _) := pure $ r = r₂ ∨ (r.lhs = r₂.rhs ∧ r.rhs = r₂.lhs) 
+        |_ := pure ff
+        end
+    ))
+|z t := (bnot ∘ list.empty) <$> (z.above.mfilter $ tree_entry.is_eq (tree_entry.strat t []))
 
 meta def explore_tasks : list Z → list action → M (list action)
 |[] acc := pure acc
@@ -22,10 +27,10 @@ meta def explore_tasks : list Z → list action → M (list action)
     trace_m "" $ ppz,
     if is_achieved then explore_tasks rest acc else do
     (subtasks,substrats) ← task.refine t,
-    let subtasks := list.map (tree_entry.of_task) $ list.filter (λ t, ¬ has_task z t) $ subtasks,
-    let substrats := list.map (tree_entry.of_strat) $ list.filter (λ s, ¬ has_strat z s) $ substrats,
+    subtasks ← list.map (tree_entry.of_task) <$> (list.mfilter (λ t, bnot <$> has_task z t) $ subtasks),
+    substrats ← list.map (tree_entry.of_strat) <$> (list.mfilter (λ t, bnot <$> has_strat z t) $ substrats),
     let children := substrats ++ subtasks,
-    --trace_m "explore: " $ children,
+    -- trace_m "explore: " children, 
     let z := z.grow children,
     let zs := z.children,
     explore_tasks (zs ++ rest) acc
@@ -35,9 +40,12 @@ meta def explore : Z → M (list action) := λ z, explore_tasks [z] []
 meta def explore_strategy : action → M (list action)
 |⟨s,z⟩ := do
   (subtasks,substrats) ← strategy.refine s,
-  let subtasks := list.map tree_entry.of_task $ subtasks,
-  let substrats := list.map tree_entry.of_strat $ substrats,
-  explore_tasks (children $ grow (substrats ++ subtasks) $ z) []
+--   trace_m "explore_strategy: " $ subtasks,
+  subtasks ← list.map (tree_entry.of_task) <$> (list.mfilter (λ t, bnot <$> has_task z t) $ subtasks),
+  substrats ← list.map (tree_entry.of_strat) <$> (list.mfilter (λ t, bnot <$> has_strat z t) $ substrats),
+  let children := substrats ++ subtasks,
+--   trace_m "explore_strategy: " $ children,
+  explore_tasks (tree.zipper.children $ tree.zipper.grow children $ z) []
 
 meta def push_achieved : task → Z → Z := map_item ∘ tree_entry.push_achieved
 /-- Fold over all of the achieved tasks strictly above the current zipper. -/
@@ -55,22 +63,47 @@ meta def execute : action → M unit
   mfold_achieved (λ _ ach, do
     r ← ach.test ce',
     when (¬r) (fail "strategy caused a previously achieved task to fail")
-  ) () z
+  ) () z,
+  targ ← target, trace targ
+
+meta def trace_path : M unit := do
+    ce ← get_ce,
+    -- ppce ← pp ce,
+    path ← get_path,
+    -- trace path
+    r ← (ce::path).reverse.mmap (λ x, tactic.pp x),
+    trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
 
 meta def ascend : Z → M (list action) := λ z,
   match z.item with
   |(tree_entry.task t _) := do
     ce ← get_ce,
     is_achieved ← task.test ce t,
-    -- trace_m "ascend: " $ (t,is_achieved,ce), 
-    if is_achieved then
+    -- trace_m "ascend: " $ (t,is_achieved,ce,z.above), 
+    if is_achieved then do
+    --   z.up_drop >>= (λ z, pure $ tree.zipper.item <$> z.children) >>= λ p, tactic.trace p,
       match up_drop z with
-      |none := do trace "done!", pure []
+      |none := do trace "done!", trace_path, pure []
       |some z := do
         z ← pure $ push_achieved t z,
+        -- trace $ z.above,
+        -- (ach,r) ← @list.mpartition _ _ _ task _ (λ z, 
+        --     match tree.zipper.item z with
+        --     |zi@(tree_entry.task tsk _) := do 
+        --         is_achieved ← task.test ce t,
+        --         if is_achieved then pure $ sum.inl t
+        --         else pure $ sum.inr z.current
+        --     |te := pure $ sum.inr z.current
+        --     end
+        -- ) z.children,
+        -- trace_m "ascend: " $ tree.zipper.item <$> z.children, 
+        -- trace_m "ascend: " $ tree.head_item <$> r, 
+        --z ← pure $ list.foldl (λ z t, push_achieved t z) z ach,
+        -- z ← pure $ z.set_children r,
         match z.children with
         |[] := ascend z
-        |ch := do
+        |ch@(h::t) := do
+
           -- [FIXME] currently assuming all of t's siblings are also tasks!
           actions ← explore_tasks ch [], 
           -- trace_m "ascend: " $ actions, 

@@ -9,6 +9,7 @@ meta def strategy.merge : strategy → strategy → M strategy
     pure $ Use r
 |_ _ := failure
 
+
 meta def task.test : expr → task → M bool
 |ce (task.Create e) := do
     e ← instantiate_mvars e,
@@ -21,6 +22,12 @@ meta def task.test : expr → task → M bool
     -- trace_m "task.test: " $ t,
     o ← hypothetically (unify e ce), 
     pure o.is_some
+
+meta def hoist : task → strategy → M strategy
+|t s@(Use r₁) := do
+    passes ← task.test r₁.rhs t,
+    if passes then pure s else failure
+|_  _ := failure
 
 /-- Do In One Move. Check the lookahead table and see if any of the entries in there cause the task to be achieved. -/
 meta def task.diom : task → M (list strategy) := λ t, do
@@ -58,16 +65,39 @@ meta def get_distance_reducers : expr → expr → M (list rule)
         pure $ new_dist < current_dist) <|> pure ff
     )
 
+meta def has_single_subterm : expr → M unit := λ a, do
+    lhs ← get_ce,
+    rhs ← get_rhs,
+    zipper.has_single_subterm a $ zipper.zip lhs,
+    -- [HACK] if the given symbol occurs twice in the RHS then we shouldn't consider it as a strategy
+    -- this is a hack because really the refinement process shouldn't look at higher tasks.
+    c ← zipper.count_subterms a $ zipper.zip rhs,
+    when (c > 1) failure,
+    pure ⟨⟩
+
+
 meta def can_use_ReduceDistance : expr → M strategy := λ e, (do
     [a,b] ← zipper.get_proper_children e | failure,
     ce ← get_ce,
-    [za] ← zipper.find_subterms a $ zipper.zip ce | failure,
-    [zb] ← zipper.find_subterms b $ zipper.zip ce | failure,
-    zipper.get_distance ce a b,
-    _::_ ← get_distance_reducers a b | failure,
+    zce ← pure $ zipper.zip ce, 
+    rhs ← get_rhs,
     -- trace_m "can_use_ReduceDistance" $ (a,b),
+    has_single_subterm a,
+    has_single_subterm b, 
+    dist ← zipper.get_distance ce a b,
+    -- trace_m "can_use_ReduceDistance" $ (a,b,dist),
+    _::_ ← get_distance_reducers a b | failure,
     pure $ ReduceDistance a b
     )
+
+meta def can_use_commutativity : expr → M bool := λ e, (do 
+    [a,b] ← zipper.get_proper_children e | failure,
+    ce ← get_ce,
+    zipper.has_single_subterm a $ zipper.zip ce,
+    zipper.has_single_subterm b $ zipper.zip ce,
+    zipper.get_distance ce b a,
+    pure tt
+) <|> pure ff
 
 meta def task.refine (t : task) : M refinement :=
 try_dioms t <|>
@@ -78,6 +108,10 @@ match t with
     ce ← get_ce,
     rt ← get_rule_table,
     submatches ← rt.submatch e,
+    use_comm ← can_use_commutativity e,
+    -- trace_m "task.refine: " $ use_comm,
+    submatches ← if use_comm then pure submatches else submatches.mfilter (λ z, bnot <$> rule.is_commuter z),
+    -- [TODO] need a way of ignoring commutativity here. 
     -- trace_m "task.refine: " $ submatches,
     strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
     pure $ ([],rss ++ strats)
@@ -110,7 +144,7 @@ meta def strategy.refine : strategy → M refinement
         l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
         if l.empty then pure lz else failure
     ) $ zipper.zip $ r.lhs,
-    let subs := subs.map (λ z, task.Create $ z.current),
+    subs ← subs.mmap (λ z, task.Create <$> instantiate_mvars z.current),
     pure ⟨subs, []⟩
 
 

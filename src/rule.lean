@@ -136,4 +136,21 @@ namespace rule
         pure $ table.size $ expr.fold r.lhs (table.empty) (λ e _ t, if expr.is_mvar e then table.insert e t else t)
 
 
+    meta def is_commuter (r : rule) : tactic bool :=
+    match r.lhs, r.rhs with
+    | (expr.app (expr.app f1 (n1)) (m1))
+    , (expr.app (expr.app f2 (n2)) (m2)) := (do
+        tactic.is_def_eq f1 f2,
+        tactic.is_def_eq n1 m2,
+        tactic.is_def_eq n2 m1,
+        pure tt) <|> pure ff
+    |_, _ := pure ff 
+    end
+
+    meta def is_def_eq (r₁ r₂ : rule) : tactic bool :=
+        tactic.is_success $ (do 
+        tactic.is_def_eq r₁.lhs r₂.lhs,
+        tactic.is_def_eq r₁.rhs r₂.rhs
+        )
+
 end rule

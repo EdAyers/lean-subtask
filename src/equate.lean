@@ -64,8 +64,8 @@ namespace add_grp_theory
     def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
     meta def rules := rule_table.of_names [ 
         ``A1, ``A2L, ``A2R, ``A3L, ``A3R, ``A4, ``A2SS, 
-        ``AIM,
-        ``AIM2
+        ``AIM
+        , ``AIM2
         ]
 end add_grp_theory
 

@@ -380,6 +380,12 @@ namespace zipper
     meta def find_subterms (e : expr) : zipper → tactic (list zipper)
     := traverse_proper (λ acc z, (does_unify e z *> pure (z::acc)) <|> pure acc) []
 
+    meta def has_single_subterm (e : expr) : zipper → tactic (zipper)
+    := λ z, do [x] ← find_subterms e z, pure x
+
+    meta def count_subterms (e : expr) : zipper → tactic ℕ
+    := λ z, do xs ← find_subterms e z, pure $ list.length xs
+
     meta def find_subterm (e : expr) : zipper → tactic zipper
     |z :=
         (does_unify e z *> pure z)

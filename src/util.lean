@@ -36,6 +36,8 @@ meta def new_goal : option expr → tactic expr
 |none := mk_mvar
 |(some e) := mk_meta_var e
 
+meta def tactic.is_success {α} (t : tactic α) : tactic bool := (t *> pure tt) <|> pure ff
+
 /-- `fabricate type s` uses tactic `s` to make an instance of `type`. It saves and restores the goals of the tactic. -/
 meta def tactic.fabricate (type : option expr) (strat : tactic unit) : tactic expr := do
     new_g ← new_goal type,
@@ -94,6 +96,9 @@ meta def expr.binding_body_all : expr → option expr
 |(expr.lam _ _ _ b) := some b
 |(expr.elet _ _ _ b) :=some b
 |_ := none
+
+meta def expr.is_composite : expr → bool
+:= λ e, e.is_pi ∨ e.is_lambda ∨ e.is_app ∨ e.is_let
 
 meta def expr.mfold2  {T} [monad T] [alternative T]  {α} (f : expr → expr → α → T α) : expr → expr → α → T α :=
 λ e₁ e₂ a, f e₁ e₂ a <|> match e₁, e₂ with

@@ -6,7 +6,7 @@ universe u
 open robot.vector_theory
 variables {A B : V → V} {x y z u v w : V} {μ ν: k} {a b c d e : k}
 example : (x + y) + z = (z + x) + y := 
-by equate -- [TODO] this should be really fast.
+by equate
 --set_option pp.notation false
 example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
 by equate
@@ -23,7 +23,7 @@ example (il : is_linear A) :
 by equate 
 example (il : is_linear A) : 
     ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
-by equate
+by equate 
 end
 section
     universe u
@@ -62,14 +62,13 @@ section
     lemma assoc : (l ++ s) ++ t = l ++ (s ++ t) :=
     begin
         induction l with lh lt,
-        equate, -- irl would just do simp [*] for these.
+        equate,
         equate
     end
-    open list_theory
     lemma rev_app_rev : reverse (l ++ s) = reverse s ++ reverse l :=
     begin
         induction l,
-        symmetry, equate, -- [HACK] can I get this to work?
+        equate,
         equate [``assoc]  
     end
     /- Compare the above with mathlib version:

@@ -19,6 +19,10 @@ namespace task
     |(Create x) := pure ((++) "Create ") <*> tactic.pp x
     |(CreateAll x) := pure (λ x, "CreateAll " ++ x) <*> tactic.pp x
     end⟩
+    meta def is_def_eq : task → task → tactic bool
+    |(Create x) (Create y) := tactic.is_success $ tactic.is_def_eq x y
+    |(CreateAll x) (CreateAll y) := tactic.is_success $ tactic.is_def_eq x y
+    |_ _ := pure ff
 end task
 open task
 
@@ -43,6 +47,11 @@ namespace strategy
         | (Use x) := do x ← tactic.pp x, pure $ "Use " ++ x
         | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
     end⟩
+    meta def is_def_eq : strategy → strategy → tactic bool
+    |(Use r₁) (Use r₂) := rule.is_def_eq r₁ r₂
+    |(ReduceDistance a b) (ReduceDistance c d) :=
+        tactic.is_success $ (do tactic.is_def_eq a c, tactic.is_def_eq b d)
+    |_ _ := pure ff
 end strategy
 
 meta inductive tree_entry : Type
@@ -64,6 +73,14 @@ namespace tree_entry
     | (tree_entry.strat s a) := (tree_entry.strat s $ f a) | (tree_entry.task t a) := tree_entry.task t $ f a
     meta def push_achieved (t : robot.task) : tree_entry → tree_entry := map_achieved ((::) t)
     meta instance : has_to_tactic_format tree_entry := ⟨λ x, match x with |(task t _ ) := tactic.pp t | (strat s _ ) := tactic.pp s end⟩
+    meta def is_def_eq : tree_entry → tree_entry → tactic bool
+    |(task a _) (task b _) := task.is_def_eq a b
+    |(strat a _) (strat b _) := strategy.is_def_eq a b 
+    |_ _ := pure ff
+    meta def is_eq : tree_entry → tree_entry → tactic bool
+    |(task a _) (task b _) := pure $ a = b
+    |(strat a _) (strat b _) := pure $ a = b
+    |_ _ := pure ff
 end tree_entry
 
 meta def task_tree := tree tree_entry 

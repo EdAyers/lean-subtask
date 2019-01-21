@@ -53,7 +53,8 @@ def up : zipper α → option (zipper α)
 /--Go up and remove the current branch from the resulting tree. -/
 def up_drop : zipper α → option (zipper α) 
 |⟨path.top _, c⟩ := none
-|⟨path.down a n l p, c⟩ := some $ zipper.mk p $ tree.branch a $ list.drop n l
+|⟨path.down a n l p, c⟩ := 
+    some $ zipper.mk p $ tree.branch a $ list.remove_nth l n
 
 meta def unzip : zipper α → tree α := current ∘ option.repeat up
 
@@ -68,8 +69,9 @@ def children : zipper α → list (zipper α)
 |_ := []
 def set_current : tree α → zipper α → zipper α | t ⟨p,_⟩ := ⟨p,t⟩
 def map_current : (tree α → tree α) → zipper α → zipper α | f z := set_current (f $ current z) z
+def set_children : list (tree α) → zipper α → zipper α := λ c z, map_current (set_children c) z
 /--Replace the children of current to be leaves of the given list instead.-/
-def grow : list α → zipper α → zipper α |c z := z.map_current $ set_children $ leaf <$> c
+def grow : list α → zipper α → zipper α |c z := z.map_current $ tree.set_children $ leaf <$> c
 
 def item : zipper α → α := head_item ∘ current
 def map_item (f : α → α) : zipper α → zipper α := map_current (map_head_item f)

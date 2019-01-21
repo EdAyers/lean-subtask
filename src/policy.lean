@@ -9,6 +9,7 @@ meta def score_rule (r : rule) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 
     ce ← get_ce,
+    lookahead ← get_lookahead,
     /- IDEA: add a point for every large common subterm between ce and lhs  -/
     lcsts ← zipper.largest_common_subterms (zipper.zip ce) (zipper.zip r.lhs),
     let lcsts :=  lcsts.foldl (λ acc z, if z.is_terminal then acc else acc + 1 ) 0 ,
@@ -19,8 +20,14 @@ meta def score_rule (r : rule) : M int := do
     lhs_symbs ← zipper.count_symbols $ r.lhs,
     let overlap := table.size $ ce_symbs ∩ lhs_symbs,
     let symm_diff := table.size (ce_symbs ∪ lhs_symbs) - overlap,
-
-    pure $ 0 + (if is_local then 10 else 0) - meta_count + lcsts - symm_diff
+    -- [TODO] if the LHS is in the lookahead table then use that
+    has_diom ← 
+        if ¬ r.lhs.is_composite then pure ff else
+            bnot <$> list.empty 
+            <$> lookahead.mcollect (λ x, 
+                state_t.lift $ hypothetically' $ (do zipper.find_subterm r.lhs (zipper.zip $ rule.rhs x) , pure x) )
+        ,
+    pure $ 0 + (if is_local then 10 else 0) + (if has_diom then 10 else 0) - meta_count + /- lcsts -/ - symm_diff
 
 meta def score_strategy : strategy → M int
 |(strategy.ReduceDistance a b) := pure 0
