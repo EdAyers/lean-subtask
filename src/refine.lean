@@ -53,17 +53,24 @@ meta def try_dioms : task → M refinement | t := do
     if ¬ dioms.empty then pure ([],dioms) else failure
 
 open ez tactic
-meta def get_distance_reducers : expr → expr → M (list rule)
+meta def get_distance_reducer : expr → expr → M (rule)
 | a b := do
     ce ← get_ce,
     current_dist ← zipper.get_distance ce a b,
     -- trace_m "\ngdr: " $ (ce, current_dist),
     rs ← get_lookahead,
-    rs.mfilter (λ r, (do
-        new_dist ← zipper.get_distance r.rhs a b,
+    drs ← rs.mcollect (λ r, (do
+        new_dist ← zipper.get_distance (rule.rhs r) a b,
         -- trace_m "gdr: " $ (r.rhs, new_dist),
-        pure $ new_dist < current_dist) <|> pure ff
-    )
+        pure (new_dist,r)
+        --pure $ new_dist < current_dist) <|> pure ff
+    )),
+    let drs := drs.filter (λ p : ℕ × rule, p.1 < current_dist),
+    drs ← list.minby (int.of_nat ∘ prod.fst) drs,
+    pure drs.2
+    
+
+
 
 meta def has_single_subterm : expr → M unit := λ a, do
     lhs ← get_ce,
@@ -86,7 +93,7 @@ meta def can_use_ReduceDistance : expr → M strategy := λ e, (do
     has_single_subterm b, 
     dist ← zipper.get_distance ce a b,
     -- trace_m "can_use_ReduceDistance" $ (a,b,dist),
-    _::_ ← get_distance_reducers a b | failure,
+    r ← get_distance_reducer a b,
     pure $ ReduceDistance a b
     )
 
@@ -128,7 +135,7 @@ end
 meta def strategy.execute : strategy → M unit
 |(strategy.ReduceDistance a b) := do
     repeat (do 
-        h::_ ← get_distance_reducers a b | failure,
+        h ← get_distance_reducer a b,
         run_conv $ zipper.rewrite_conv h
     )
 |s@(strategy.Use r)              := run_conv $ zipper.rewrite_conv r

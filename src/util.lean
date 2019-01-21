@@ -20,7 +20,8 @@ def list.maxidx {α} (f : α → int) (l : list α) : option nat :=
 /-- Find the maximum according to the given function. -/
 def list.maxby {α} (f : α → int) (l : list α) : option α := 
 prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.cases_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
-
+def list.minby {α} (f : α → int) (l : list α) : option α :=
+    list.maxby (has_neg.neg ∘ f) l
 def list.singleton {α} : α → list α := λ a, [a]
 
 meta def option.repeat {α} (f : α → option α) : α → α

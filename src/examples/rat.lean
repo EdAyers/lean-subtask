@@ -19,12 +19,6 @@ instance (α : Type u) [integral_domain α] : setoid (q α) :=
     --  by equate
     suffices d * (a * f) = d * (e * b), from eq_of_mul_eq_mul_left h this,
     by equate
-    -- calc
-    --   d₂ * (n₁ * d₃) = (n₁ * d₂) * d₃ : by ac_refl -- 1
-    --             ...  = (n₂ * d₁) * d₃ : by rw p    -- 1
-    --             ...  = (n₂ * d₃) * d₁ : by ac_refl -- 3
-    --             ...  = (n₃ * d₂) * d₁ : by rw q    -- 1
-    --             ...  = d₂ * (n₃ * d₁) : by ac_refl -- 2 = 8
   ⟩
 }
 def free (α : Type u) [integral_domain α] : Type* := @quotient (q α) (by apply_instance)
@@ -39,12 +33,9 @@ def add : free α → free α → free α
       assume q : a2.1 * b2.2 = b2.1 * a2.2,
       suffices (a1.1 * a2.2 + a2.1 * a1.2) * (b1.2 * b2.2) = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2), 
         from quotient.sound this,
-        by equate
-      -- calc ((a1.1 * a2.2) + (a2.1 * a1.2)) * (b1.2 * b2.2) = ((a1.1 * a2.2) * (b1.2 * b2.2) + (a2.1 * a1.2) * (b1.2 * b2.2)) : by equate
-      --                                             ...  = ((a1.1 * b1.2) * (a2.2 * b2.2) + (b1.2 * a1.2) * (a2.1 * b2.2)) : begin clear p q, equate end
-      --                                             ...  = ((b1.1 * a1.2) * (a2.2 * b2.2) + (b1.2 * a1.2) * (b2.1 * a2.2)) : by equate
-      --                                             ...  = (((b1.1 * b2.2)* (a1.2 * a2.2)) + ((b2.1 * b1.2) * (a1.2 * a2.2)))   : by ac_refl
-      --                                             ...  = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2)                     : by apply eq.symm; apply integral_domain.right_distrib
+        calc ((a1.1 * a2.2) + (a2.1 * a1.2)) * (b1.2 * b2.2) 
+              = ((b1.1 * a1.2) * (a2.2 * b2.2) + (b1.2 * a1.2) * (b2.1 * a2.2)) : by equate
+         ...  = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2)                     : by symmetry; clear p q; equate
   )
 end free
 
