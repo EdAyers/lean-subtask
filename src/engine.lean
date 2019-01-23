@@ -74,6 +74,9 @@ meta def trace_path : M unit := do
     r ← (ce::path).reverse.mmap (λ x, tactic.pp x),
     trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
 
+/-- Given a zipper entry z,
+  - If it's an achieved task, go up and repeat
+-/
 meta def ascend : Z → M (list action) := λ z,
   match z.item with
   |(tree_entry.task t _) := do
@@ -84,33 +87,15 @@ meta def ascend : Z → M (list action) := λ z,
     --   z.up_drop >>= (λ z, pure $ tree.zipper.item <$> z.children) >>= λ p, tactic.trace p,
       match up_drop z with
       |none := do trace "done!", trace_path, pure []
-      |some z := do
-        z ← pure $ push_achieved t z,
-        -- trace $ z.above,
-        -- (ach,r) ← @list.mpartition _ _ _ task _ (λ z, 
-        --     match tree.zipper.item z with
-        --     |zi@(tree_entry.task tsk _) := do 
-        --         is_achieved ← task.test ce t,
-        --         if is_achieved then pure $ sum.inl t
-        --         else pure $ sum.inr z.current
-        --     |te := pure $ sum.inr z.current
-        --     end
-        -- ) z.children,
-        -- trace_m "ascend: " $ tree.zipper.item <$> z.children, 
-        -- trace_m "ascend: " $ tree.head_item <$> r, 
-        --z ← pure $ list.foldl (λ z t, push_achieved t z) z ach,
-        -- z ← pure $ z.set_children r,
-        match z.children with
-        |[] := ascend z
-        |ch@(h::t) := do
-
-          -- [FIXME] currently assuming all of t's siblings are also tasks!
-          actions ← explore_tasks ch [], 
-          -- trace_m "ascend: " $ actions, 
-          if actions.empty then ascend z else pure actions
-        end
+      |some z := do ascend z
       end
-    else explore z
+    else
+      match z.children with
+      |[] := explore z
+      |ch := do
+        actions ← explore_tasks ch [],
+        pure actions
+      end
   |(tree_entry.strat s _) :=
     (do execute (s,z), z ← up_drop z | pure [], ascend z)
     <|> 
