@@ -4,4 +4,5 @@ open robot
 namespace scratch1
 open tactic
 
+
 end scratch1

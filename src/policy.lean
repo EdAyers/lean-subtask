@@ -21,16 +21,20 @@ meta def score_rule (r : rule) : M int := do
     let symm_diff := table.size (ce_symbs ∪ lhs_symbs) - overlap,
     -- [TODO] if the LHS is in the lookahead table then use that
     has_diom ← 
-        if ¬ r.lhs.is_composite then pure ff else
+        if ¬ expr.is_composite r.lhs then pure ff else
             bnot 
             <$> list.empty 
-            <$> lookahead.mcollect (λ x, 
-                    state_t.lift 
-                    $ hypothetically' 
-                    $ (do zipper.find_subterm r.lhs (zipper.zip $ rule.rhs x) , pure x)
-                )
+            <$> list.mcollect (λ x, 
+                state_t.lift 
+                $ tactic.hypothetically' 
+                $ (do 
+                    zipper.find_subterm r.lhs (zipper.zip $ rule.rhs x), 
+                    pure x)
+            ) lookahead
         ,
-    pure $ 0 + (if is_local then 10 else 0) + (if has_diom then 10 else 0) - meta_count + /- lcsts -/ - symm_diff
+
+    is_comm ← rule.is_commuter r,
+    pure $ (if is_comm then -5 else 0) + (if is_local then 10 else 0) + (if has_diom then 10 else 0) - meta_count + /- lcsts -/ - symm_diff
 
 meta def score_strategy : strategy → M int
 |(strategy.ReduceDistance a b) := pure 0

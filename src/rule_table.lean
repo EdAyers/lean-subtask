@@ -73,7 +73,7 @@ namespace rule_table
     meta def empty : rule_table := {head_table := ∅, submatch_table := ∅}
 
     meta def get_key : expr → name
-    |(expr.app f a) := if f.is_var || f.is_mvar || f.is_local_constant then `rule_table.app else get_key f
+    |(expr.app f a) := if f.is_var || expr.is_mvar f || f.is_local_constant then `rule_table.app else get_key f
     |(expr.const n _) := n
     |(expr.var n) := `rule_table.wildcard
     |e := `rule_table.default
@@ -118,7 +118,7 @@ namespace rule_table
         -- trace z,
         hrs ← head_rewrites z.current rt cfg,
         -- trace head_rewrites,
-        hrs ← hrs.mcollect (λ rw, ez.zipper.apply_rule rw z),
+        hrs ← list.mcollect (λ rw, ez.zipper.apply_rule rw z) hrs,
         --trace head_rewrites,
         acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,

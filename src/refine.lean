@@ -1,6 +1,6 @@
 import .M .zipper
 namespace robot
-open strategy task tactic
+open strategy task tactic robot.tactic
 meta def strategy.merge : strategy → strategy → M strategy 
 |(Use r₁) (Use r₂) := do
     unify r₁.lhs r₂.lhs,
@@ -59,12 +59,12 @@ meta def get_distance_reducer : expr → expr → M (rule)
     current_dist ← zipper.get_distance ce a b,
     -- trace_m "\ngdr: " $ (ce, current_dist),
     rs ← get_lookahead,
-    drs ← rs.mcollect (λ r, (do
+    drs ← list.mcollect (λ r, (do
         new_dist ← zipper.get_distance (rule.rhs r) a b,
         -- trace_m "gdr: " $ (r.rhs, new_dist),
         pure (new_dist,r)
         --pure $ new_dist < current_dist) <|> pure ff
-    )),
+    )) rs,
     let drs := drs.filter (λ p : ℕ × rule, p.1 < current_dist),
     drs ← list.minby (int.of_nat ∘ prod.fst) drs,
     pure drs.2
@@ -117,7 +117,7 @@ match t with
     submatches ← rt.submatch e,
     use_comm ← can_use_commutativity e,
     -- trace_m "task.refine: " $ use_comm,
-    submatches ← if use_comm then pure submatches else submatches.mfilter (λ z, bnot <$> rule.is_commuter z),
+    submatches ← pure submatches, -- if use_comm then pure submatches else submatches.mfilter (λ z, bnot <$> rule.is_commuter z),
     -- [TODO] need a way of ignoring commutativity here. 
     -- trace_m "task.refine: " $ submatches,
     strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
