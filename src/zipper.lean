@@ -1,7 +1,7 @@
 /- Expression zipper -/
 import .util .rule
 namespace ez
-
+open robot
 @[derive decidable_eq]
 meta inductive path
 |app_left        (left : unit) (right : expr) : path
@@ -270,6 +270,8 @@ namespace zipper
 
     private meta def is_proper (p : param_info) : bool := ¬(param_info.is_implicit p || param_info.is_inst_implicit  p || param_info.is_prop p)
 
+    meta def is_type (z : zipper) : tactic bool := expr.is_sort <$> tactic.infer_type z.current
+
     /-- Take a zipper where the current expression is a function application, and return zippers over all of the non-implicit, non-prop arguments.-/
     meta def down_proper (z : zipper) : tactic (expr × list zipper) := do
         let c := z.current,
@@ -282,6 +284,8 @@ namespace zipper
             z' ← app_left z,
             if is_proper p then do
                 zr ← app_right z,
+                --t ← is_type zr,
+                --if t then pure (zippers,z') else
                 pure (zr::zippers,z')
             else pure (zippers, z')) (([] : list zipper), z),
         pure (f,zippers)
@@ -331,7 +335,7 @@ namespace zipper
     meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e,
         maximal_monotone (λ z,
             if z.is_mvar || z.is_constant then failure
-            else hypothetically' (unify e z.current) *> pure z
+            else tactic.hypothetically' (unify e z.current) *> pure z
         ) E
 
     meta def rewrite_conv (r : rule) : conv unit := do	
@@ -353,7 +357,7 @@ namespace zipper
         minimal_monotone (λ z, 
             if z.is_mvar || z.is_constant then failure else do 
             let o := expr.occurs z.current l,
-            matches ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
+            matches ← zipper.maximal_monotone (λ rz, (tactic.hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
             -- trace_m "lus: " $ (z,l,o, matches),
             if ¬ matches.empty then failure else pure z
         ) z
@@ -375,7 +379,7 @@ namespace zipper
 
     meta def does_unify (e : expr) : zipper → tactic unit
     | z := if z.is_mvar then failure else
-        (hypothetically' $ unify e z.current)
+        (tactic.hypothetically' $ unify e z.current)
 
     meta def find_subterms (e : expr) : zipper → tactic (list zipper)
     := traverse_proper (λ acc z, (does_unify e z *> pure (z::acc)) <|> pure acc) []
@@ -396,10 +400,11 @@ namespace zipper
     meta def distance_to_subterm_down (e : expr) : zipper → nat → tactic nat
     |z d :=
         if z.is_mvar then failure else
-        (hypothetically' $ unify e z.current *> pure d)
+        (tactic.hypothetically' $ unify e z.current *> pure d)
         <|> do
             (_,zs) ← down_proper z,
-            zs.with_indices.mfirst (λ iz, distance_to_subterm_down iz.2 $ iz.1 + d + 1)
+            list.mfirst (λ iz : ℕ × zipper, distance_to_subterm_down iz.2 $ iz.1 + d + 1)
+            $ list.with_indices zs
 
     meta def is_app_right : zipper → bool
     |⟨(path.app_right _ _)::t,_,_⟩ := tt
@@ -427,7 +432,6 @@ namespace zipper
     --     (a,z) ← zipper.traverse (λ (t:dict name expr) z, _) (∅,z) ,
     --     sorry
 
-
     -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
     --     hypothetically (do
     --         l_ctxt ← src.intro_ctxt [] $ l.ctxt.reverse,
@@ -438,7 +442,6 @@ namespace zipper
     --         -- now some of the metavariables in l_ctxt and r_ctxt will be assigned.
     --         -- also note that these assignments can depend on other non-assigned metavariables.
     --         -- [FIXME] for now, we ignore this case and assume that the metas are never assigned wrt other metas.
-
     --         expr.a
     --     )
 

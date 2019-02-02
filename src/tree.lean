@@ -65,7 +65,7 @@ def down : ℕ → zipper α → option (zipper α)
 def is_leaf : zipper α → bool |⟨p,leaf _⟩ := tt | _ := ff
 
 def children : zipper α → list (zipper α)
-|⟨p,tree.branch a l⟩ := l.mapi (λ i c, zipper.mk (path.down a i l p) $ c)
+|⟨p,tree.branch a l⟩ := list.mapi (λ i c, zipper.mk (path.down a i l p) $ c) l
 |_ := []
 def set_current : tree α → zipper α → zipper α | t ⟨p,_⟩ := ⟨p,t⟩
 def map_current : (tree α → tree α) → zipper α → zipper α | f z := set_current (f $ current z) z

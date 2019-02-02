@@ -1,5 +1,5 @@
 open tactic
-
+namespace robot
 /- [TODO] most of these are implemented in mathlib. Consider referencing mathlib and using these. -/
 
 universes u v
@@ -113,6 +113,9 @@ e.fold [] (λ e' _ es, if e'.is_local_constant then insert e' es else es)
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
 |_ := ff
+meta def expr.is_sort : expr → bool
+|(expr.sort _) := tt
+|_ := ff
 
 def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []
@@ -165,6 +168,7 @@ section
         ) (⟨[],[]⟩), 
         pure ⟨xs.reverse,ys.reverse⟩
 end
+end robot
 
 namespace test
     meta def assert (test : bool) (msg : option string := none) : tactic unit := when (¬test) $ fail $ option.get_or_else msg "Assertion failed"
@@ -174,4 +178,3 @@ namespace test
         fail $ (to_fmt "Assertion failed: \nexpected: ") ++ format.nest 10 epp ++ "\n  actual: " ++ format.nest 10 app ++ "\n" ++ msg
     -- [TODO] `meta def snapshot` would be the dream. You could do this by dumping the to_tactic_format code to a text file and then reading it back using io. I guess you would also need a monad called test.
 end test
-

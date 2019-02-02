@@ -1,5 +1,5 @@
 import .util .table
-open tactic
+open tactic robot
 @[derive decidable_eq]
 meta structure hyp :=
 (n : name) (bi : binder_info) (type : expr)

@@ -1,6 +1,6 @@
 import .data .refine
 namespace robot
-open tree.zipper tactic
+open tree.zipper tactic robot.tactic
 
 meta def has_task : Z → task → tactic bool
 |z t := (bnot ∘ list.empty) <$> (z.above.mfilter $ tree_entry.is_eq (tree_entry.task t []))
@@ -24,7 +24,7 @@ meta def explore_tasks : list Z → list action → M (list action)
     ce ← get_ce,
     is_achieved ← task.test ce t,
     --trace_state,
-    trace_m "" $ ppz,
+    tactic.trace_m "" $ ppz,
     if is_achieved then explore_tasks rest acc else do
     (subtasks,substrats) ← task.refine t,
     subtasks ← list.map (tree_entry.of_task) <$> (list.mfilter (λ t, bnot <$> has_task z t) $ subtasks),
