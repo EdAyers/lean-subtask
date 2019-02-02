@@ -96,7 +96,11 @@ namespace rule_table
         of_rules $ rs ++ revs
     private meta def get_head_rewrites : name → rule_table → table rule | k {head_table := ht, ..} := ht.get k
     meta structure rewrites_config :=
-    (wilds := ff) -- include rules such as `?x = ?x * 1` where the lhs can be anything. This slows things down substantially. [TODO] optimise so that there are some type/typeclass checks on it.
+    (wilds := ff) 
+    -- setting wilds causes inclusion of rules such as `?x = ?x * 1` where the lhs can be anything. 
+    -- This slows things down substantially 
+    -- [TODO] these 'wild' rules are handled by their own system.
+    -- [TODO] optimise so that there are some type/typeclass checks on it.
     -- (annihilators := ff) [TODO]
     
     meta def head_rewrites (lhs : expr) (rt : rule_table)  (cfg : rewrites_config := {}) : (tactic $ list rule) := do
@@ -131,7 +135,7 @@ namespace rule_table
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
     /--`submatch e rt` finds rules such that the rhs of the rule contains `e`-/
-    meta def submatch : expr → rule_table → (tactic (list rule)) | e rt :=
+    meta def submatch : expr → rule_table → tactic (list rule) | e rt :=
         let key := get_key e in
         let submatches := rt.submatch_table.get key in
         if (key = `rule_table.app ) then list.mcollect (robot.submatch.run_app e) submatches

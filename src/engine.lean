@@ -82,20 +82,13 @@ meta def ascend : Z → M (list action) := λ z,
   |(tree_entry.task t _) := do
     ce ← get_ce,
     is_achieved ← task.test ce t,
-    -- trace_m "ascend: " $ (t,is_achieved,ce,z.above), 
     if is_achieved then do
-    --   z.up_drop >>= (λ z, pure $ tree.zipper.item <$> z.children) >>= λ p, tactic.trace p,
       match up_drop z with
       |none := do trace "done!", trace_path, pure []
       |some z := do ascend z
       end
     else
-      match z.children with
-      |[] := explore z
-      |ch := do
-        actions ← explore_tasks ch [],
-        pure actions
-      end
+      explore z
   |(tree_entry.strat s _) :=
     (do execute (s,z), z ← up_drop z | pure [], ascend z)
     <|> 

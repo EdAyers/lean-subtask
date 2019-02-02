@@ -18,6 +18,10 @@ example : (a + c) * b = a * b + b * c :=
 by equate 
 example : (x + y) + (z + w) = (x + z) + (y + w) := 
 by equate
+example : (x + y) + (z + w) + v = v+ (x + z) + (y + w) := 
+by equate
+example : (x + y) + (z + w) + (v + u) = (u + v) + (x + z) + (y + w) := 
+by equate
 example (il : is_linear A) :
     μ • A (x) + ν • A (y) = A (μ • x + ν • y)  :=
 by equate 
@@ -64,18 +68,13 @@ section
         induction l with lh lt,
         equate,
         equate
-    end
+    end -- `induction l; simp *`
     lemma rev_app_rev : reverse (l ++ s) = reverse s ++ reverse l :=
     begin
         induction l,
         equate,
         equate [``assoc]  
-    end
-    /- Compare the above with mathlib version:
-        @[simp] theorem reverse_append (s t : list α) : reverse (s ++ t) = (reverse t) ++ (reverse s) :=
-        by induction s; [rw [nil_append, reverse_nil, append_nil],
-        simp only [*, cons_append, reverse_cons, append_assoc]]
-        -/
+    end -- `induction l; simp *`
 end
 
 
