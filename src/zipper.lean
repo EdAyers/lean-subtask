@@ -168,6 +168,7 @@ namespace zipper
     meta def unzip : zipper → expr := λ z, option.rec_on (up z) (current z) (unzip)
     meta def unzip_with_ctxt : zipper → expr × list src := λ z, option.rec_on (up z) (current z, ctxt z) unzip_with_ctxt
     meta def zip : expr → zipper := λ e, zipper.mk [] [] e
+    meta instance : has_coe expr zipper := ⟨zip⟩
     meta def zip_with_ctxt : list src → expr → zipper
     |ctxt current := {path := [], ctxt:= ctxt, current := current}
     -- meta def zip_with_metas : telescope → expr → zipper := zip_with_ctxt ∘ src.mvars_of_telescope
@@ -331,12 +332,15 @@ namespace zipper
             (_,children) ← down_proper z,
             kids ← list.join <$> list.mmap maximal_monotone children,
             pure $ kids
-
+    /--`find_occurences z e` finds subzippers of `z` which non-trivially unify with `e`. -/
     meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e,
         maximal_monotone (λ z,
             if z.is_mvar || z.is_constant then failure
             else tactic.hypothetically' (unify e z.current) *> pure z
         ) E
+
+    meta def has_occurences : zipper → expr → tactic bool 
+    := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
     meta def rewrite_conv (r : rule) : conv unit := do	
         lhs ← conv.lhs >>= instantiate_mvars,
@@ -426,6 +430,8 @@ namespace zipper
     meta def get_proper_children (e : expr) : tactic (list expr) := do
         e ← instantiate_mvars e,
         (list.map current <$> prod.snd <$> (down_proper $ zip e)) <|> pure []
+    meta def get_smallest_complex_subterms (z : zipper) : tactic (list zipper) := do
+        minimal_monotone (λ z, do ⟨_,[]⟩ ← down_proper z | failure, pure z) z
 
     -- meta def clone_mvars : zipper → tactic (zipper)
     -- |z := do 

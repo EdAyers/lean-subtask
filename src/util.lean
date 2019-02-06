@@ -23,6 +23,11 @@ prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.ca
 def list.minby {α} (f : α → int) (l : list α) : option α :=
     list.maxby (has_neg.neg ∘ f) l
 def list.singleton {α} : α → list α := λ a, [a]
+def list.mfirst {T} [alternative T] {α β} (f : α → T β) : list α → T β
+|[] := failure |(h::t) := f h <|> list.mfirst t
+def list.msome {T} [monad T] {α} (f : α → T bool) : list α → T bool
+|[] := pure ff
+|(h::t) := f h >>= λ x, if x then pure tt else list.msome t
 
 meta def option.repeat {α} (f : α → option α) : α → α
 |a := option.get_or_else (option.repeat <$> f a) a
@@ -110,12 +115,21 @@ meta def expr.mfold2  {T} [monad T] [alternative T]  {α} (f : expr → expr →
 meta def list_local_consts (e : expr) : list expr :=
 e.fold [] (λ e' _ es, if e'.is_local_constant then insert e' es else es)
 
+
+
+
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
 |_ := ff
 meta def expr.is_sort : expr → bool
 |(expr.sort _) := tt
 |_ := ff
+
+meta def expr.is_term (e : expr) : tactic bool 
+:= (bnot ∘ expr.is_sort) <$> infer_type e
+
+meta def list_local_const_terms (e : expr) : tactic (list expr) 
+:= mfilter expr.is_term $ list_local_consts e
 
 def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []

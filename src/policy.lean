@@ -5,6 +5,39 @@ meta def first_policy : policy
 |[] := failure
 |l := pure l
 
+meta def is_term : expr → tactic bool := λ e, do
+    T ← infer_type e >>= instantiate_mvars,
+    pure $ expr.is_sort T
+open ez.zipper
+
+def weak : ℕ := 1
+def medium : ℕ := 2
+def strong : ℕ := 3
+
+meta def requires_nonmeta_variable_that_is_already_present (r : rule) : M nat := do
+    ce ← get_ce,
+    lhs_locals ← table.from_list <$> (list.mfilter ↑is_term $ list_local_consts $ r.lhs),
+    ce_locals ← table.from_list <$> (list.mfilter ↑is_term $ list_local_consts $ ce),
+    let result := table.is_empty $ lhs_locals ∩ ce_locals,
+    pure $ if result then weak else 0
+meta def requires_complex_term_that_is_already_present (r : rule) : M nat := do
+    ce ← get_ce,
+    subterms ← list.map zipper.current <$> (get_smallest_complex_subterms $ r.lhs),
+    subterms ← pure $ subterms.filter $ λ t, ¬ expr.occurs t r.rhs,
+    unify_present ← subterms.mfilter $ λ t, zipper.has_occurences t ce,
+    directly_present ← pure $ unify_present.filter $ λ t, expr.occurs t ce,
+    pure $ if unify_present.empty then 0 else if directly_present.empty then medium else strong
+meta def requires_nonmeta_variable_present_in_rule (r : rule) : M nat := do
+    -- that is, look through local constants and find hypotheses which would introduce these.
+    lcs ← list_local_const_terms r.lhs,
+    rs ← list.msome (λ lc, bnot <$> list.empty <$> M.submatch lc) lcs,
+    pure $ if rs then weak else 0
+-- meta def requires_complex_term_that_is_present_in_rule (r : rule) : M nat := do
+     /- I feel like this one will just always be true. 
+     A better refinement would be:  
+
+     -/
+--      
 meta def score_rule (r : rule) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 
