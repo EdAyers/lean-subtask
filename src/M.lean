@@ -29,7 +29,12 @@ meta def run_conv : conv unit → M unit := λ c, do
     c,
     ce' ← get_ce,
     state ← get,
-    lookahead ← rule_table.rewrites ce' state.rt,
+    -- [FIXME] this operation is a perf bottleneck -- about 500ms
+    /- Idea: store the lookahead as a table on addresses within the term.
+        Once you apply a rule, we only have to find the newly available rules in the lookahead. 
+     -/
+    
+    lookahead ← rule_table.rewrites ce' state.rt, 
     let path := ce :: state.path,
     -- state_t.lift $ tactic.target >>= tactic.trace,
     put { state with 

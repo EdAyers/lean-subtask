@@ -28,7 +28,7 @@ def list.mfirst {T} [alternative T] {α β} (f : α → T β) : list α → T β
 def list.msome {T} [monad T] {α} (f : α → T bool) : list α → T bool
 |[] := pure ff
 |(h::t) := f h >>= λ x, if x then pure tt else list.msome t
-
+def list.collect {β} (f : α → list β) : list α → list β := λ l, list.bind l f
 meta def option.repeat {α} (f : α → option α) : α → α
 |a := option.get_or_else (option.repeat <$> f a) a
 
@@ -115,7 +115,11 @@ meta def expr.mfold2  {T} [monad T] [alternative T]  {α} (f : expr → expr →
 meta def list_local_consts (e : expr) : list expr :=
 e.fold [] (λ e' _ es, if e'.is_local_constant then insert e' es else es)
 
-
+meta def expr.const_name : expr → option name
+|(expr.local_const unique pretty _ _) := some unique
+|(expr.const n _) := some n
+|(expr.mvar unique pretty _) := some unique
+|_ := none
 
 
 meta def expr.is_mvar : expr → bool

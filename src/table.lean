@@ -10,6 +10,8 @@ end foldable
 -- [TODO] make sure the argument order conventions in this file are not pointlessly different to commonly used ones.
 /-- Lightweight wrapper around `rbtree` because I keep swapping out which dictionary implementation I am using -/
 meta def table (α : Type) : Type := rb_set α
+meta def dict (k : Type) (α : Type) : Type := rb_map k α
+infixl ` ⇀ `:1 := dict
 namespace table
     variables {α : Type} [has_lt α] [decidable_rel ((<) : α → α → Prop)]
     meta def empty : table α := rb_map.mk α unit
@@ -17,15 +19,17 @@ namespace table
     meta instance has_emptyc : has_emptyc (table α) := ⟨empty⟩
     meta def from_list (l : list α) : table α  := rb_map.set_of_list l
     meta def to_list (d : table α) : list α := rb_set.to_list d
+    meta def to_dict (d : table α) : dict α unit := d
     meta def union  (l : table α ) (r : table α) := rb_set.fold r l (λ x s, rb_set.insert s x)
     meta instance has_union : has_union (table α) := ⟨union⟩
     /-- `subtract l r = {x ∈ l | x ∉ r}`-/
     meta def subtract (l : table α) (r : table α) := rb_set.fold r l (λ x s, rb_set.erase s x)
-    meta instance has_sub : has_sub (table α) := ⟨subtract⟩
+    meta instance has_sdiff : has_sdiff (table α) := ⟨subtract⟩
     meta def contains : α → table α → bool := λ a t, rb_set.contains t a
     meta instance has_mem : has_mem α (table α) := ⟨λ x T, contains x T⟩
     meta instance {x : α} {T : table α} : decidable (x ∈ T) := dite (contains x T) is_true is_false
     meta def insert : α → table α → table α := λ a t, rb_set.insert t a
+    meta def singleton : α → table α | a := insert a ∅
     meta def insert_many : list α → table α → table α := λ xs t, xs.foldl (λ t x, insert x t) t
     meta instance has_insert : has_insert α (table α) := ⟨insert⟩
     meta def erase : α → table α → table α := λ x t, rb_set.erase t x
@@ -54,7 +58,6 @@ namespace table
     meta instance : decidable_rel ((<) : table α → table α → Prop) := λ t₁ t₂, list.has_decidable_lt (to_list t₁) (to_list t₂)
 end table
 
-meta def dict (k : Type) (α : Type) : Type := rb_map k α
 namespace dict
     variables {k : Type} [has_lt k] [decidable_rel ((<) : k → k → Prop)]
     variable {α : Type}
@@ -71,7 +74,12 @@ namespace dict
     meta def modify_when_present (f : α → α) : k → dict k α → dict k α := λ key d, option.rec_on (get key d) d (λ a, insert key a d)
     meta def get_default (default : α)  (key : k) (d: dict k α) : α := option.get_or_else (get key d) default
     meta def erase : k → dict k α → dict k α := λ k d, rb_map.erase d k
+    /--Merge the two dictionaries with `r` clobbering `l` in the event of a key clash.
+    Performance tip; it iterates over all members of `r` so make sure `r` is smaller than `l`.-/
     meta def merge (l r : dict k α) := rb_map.fold r l insert
+    /--Merge two dictionaries calling `merger` in the event of a clash. Iterates over the second dictionary `r`.-/
+    meta def merge_with (merger : k → α → α → α) (l r : dict k α) : dict k α 
+    := rb_map.fold r l $ λ k a acc, acc.modify (λ o, option.rec_on o a $ merger k a) k
     meta instance : has_append (dict k α) := ⟨merge⟩
     meta def fold {β} (r : β → k → α → β) (z : β) (d : dict k α) : β := rb_map.fold d z (λ k a b, r b k a)
     meta def mfold {T} [monad T] {β} (f : β → k → α → T β) (z : β) (d : dict k α) : T β := rb_map.mfold d z (λ k a b, f b k a)
@@ -83,6 +91,8 @@ namespace dict
     meta def to_list : dict k α → list (k×α) := rb_map.to_list
     /--[HACK] not efficient, don't use in perf critical code. -/
     meta def first : dict k α → option (k×α) := fold (λ o k a, option.rec_on o (some (k,a)) some) none
+    meta def any (f : k → α → bool) : dict k α → bool := fold (λ o k a, o || f k a) ff
+    meta def all (f : k → α → bool) : dict k α → bool := fold (λ o k a, o && f k a) tt
     section formatting
         open format
         meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
@@ -140,3 +150,34 @@ namespace listdict
     -- meta instance [has_to_format κ] [has_to_format α] : has_to_format (listdict κ α) := ⟨λ (d : dict κ (list α)), to_fmt d⟩
     meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (listdict κ α) := ⟨λ (d : dict κ (list α)), tactic.pp d⟩
 end listdict
+
+/--A table which tracks the number of times that a given key has been inserted. -/
+meta def mtable (κ : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] : Type := dict κ ℕ
+
+namespace mtable
+    variables {κ : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)]
+    meta def empty : mtable κ := dict.empty
+    meta instance : has_emptyc (mtable κ) := ⟨empty⟩
+    meta def get : κ → mtable κ → ℕ := dict.get_default 0
+    meta def of_table : table κ → mtable κ := dict.map (λ x, 1) ∘ table.to_dict
+    meta def insert : κ → mtable κ → mtable κ := dict.modify_default 0 nat.succ
+    meta def of_list : list κ → mtable κ := list.foldl (function.swap insert) ∅
+    meta def erase : κ → mtable κ → mtable κ := dict.modify_when_present (λ x, x - 1)
+    /--Reset the given key to zero. Contrast with erase which merely decrements the count. -/
+    meta def clear : κ → mtable κ → mtable κ := dict.erase
+    /--Union two mtables. For performance make sure the second argument is smaller.  -/
+    meta def join : mtable κ → mtable κ → mtable κ := dict.merge_with (λ _, (+))
+    meta def to_table : mtable κ → table κ := dict.map (λ _, ⟨⟩)
+    meta def filter (f : κ → bool) : mtable κ → mtable κ := dict.filter $ λ k _, f k
+    meta instance : has_coe_to_fun (mtable κ) := ⟨λ _, κ → ℕ, λ t k, get k t⟩
+    open format
+    meta instance [has_to_tactic_format κ] : has_to_tactic_format (mtable κ) :=
+    ⟨λ t, do 
+            items ← list.mmap (λ (p:κ×ℕ), do 
+                ppk ← tactic.pp p.1, 
+                ppn ← tactic.pp p.2, 
+                pure $ ppn ++ "\t| " ++ ppk
+            ) $ dict.to_list $ t,
+            pure $ "{" ++ group (nest 1 $ format.join $ list.intersperse (to_fmt "," ++ line) $ items) ++ "}"
+    ⟩
+end mtable

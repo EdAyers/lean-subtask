@@ -117,7 +117,8 @@ meta def run_aux (π : policy) : state → list action → ℕ → conv unit
 /--Add all of the rules which appear in the local context. -/
 meta def add_hyp_rules (rt : rule_table) : tactic rule_table :=
     local_context >>= list.mfoldl (λ rt r, (do 
-        r ← rule.of_prf r, 
+        n ← expr.const_name r | failure,
+        r ← rule.of_prf n r, 
         rev ← rule.flip r, 
         pure rt >>= rule_table.insert r >>= rule_table.insert rev
     ) <|> pure rt) rt

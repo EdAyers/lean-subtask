@@ -32,22 +32,22 @@ namespace submatch
     --     ms ← ms.mmap instantiate_mvars,
     --     set_goals gs,
     --     rule.of_prf $ expr.mk_app r.pf ms.reverse
-
-    -- [BUG] run and run_app are setting metavariables in the global tactic state.
-    -- This is a common problem that I have; I want to be able to take 
     meta def run_app : expr → submatch → tactic rule
     | e ⟨r,z⟩ := do
-
         (expr.app f a) ← pure e,
         (mrule, ms) ← rule.to_mvars r,
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         current@(expr.app f₂ a₂) ← pure $ expr.instantiate_vars z.current $ ms.reverse,
         -- current ← instantiate_mvars current,
         -- trace_m "submatch.run_app: " $ (e, z),
-        unify f₂ f,
-        unify a₂ a,
+        -- wrap in a 'hypothetically'' to keep the old assignment table.
+        -- this means that any mvars in `e` are never assigned. 
+        tactic.hypothetically' (do 
+            unify f₂ f,
+            unify a₂ a,
+            mrule.instantiate_mvars
+        ) 
         --trace_state,
-        mrule.instantiate_mvars
 
     
     meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do

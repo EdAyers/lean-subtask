@@ -26,6 +26,7 @@ meta def telescope.to_pattern (t : telescope) (e : expr) : tactic pattern := do
 
 @[derive decidable_eq]
 meta structure rule := -- relation is always `=` for now.
+(id : name)
 (ctxt : telescope) -- arguments, local context. [IDEA] instead; do this by just having a tactic that creates the right environment?
 (lhs  : expr) 
 (rhs  : expr)
@@ -41,12 +42,12 @@ namespace rule
     meta instance : has_to_string rule := ⟨λ r, (to_string r.lhs) ++ " = " ++ (to_string r.rhs)⟩
     meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= whnf >>= tactic_format_expr⟩
 
-    meta def of_prf : expr → tactic rule := λ pf, do
+    meta def of_prf (id : name) : expr → tactic rule := λ pf, do
         t ← infer_type pf >>= whnf,
         -- trace t, 
         ⟨ctxt,`(%%lhs = %%rhs)⟩ ← pure $ telescope.of_pis t 
         | (do pft ← pp pf, ppt ← pp t, fail $ (to_fmt "rule.of_prf: supplied expression ") ++ pft ++ " : " ++ ppt ++ " is not an equality proof "),
-        pure {ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf, type := t}
+        pure {id := id, ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf, type := t}
 
     meta def flip (r : rule) : tactic rule := do
         let P := r.ctxt.foldl (λ e ⟨n,b,y⟩, expr.pi n b (to_pexpr y) e) $ ```(%%r.rhs = %%r.lhs),
@@ -63,11 +64,12 @@ namespace rule
              , rhs  := r.lhs
              , type := r.type
              , pf   := pf
+             , id := r.id ++ `flipped
              }
 
     -- meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
-    meta def is_wf (r : rule) : tactic bool := do r' ← of_prf $ pf $ r, pure $ r = r'
-    meta def of_name (n : name) : tactic rule := resolve_name n >>= pure ∘ pexpr.mk_explicit >>= to_expr >>= rule.of_prf
+    meta def is_wf (r : rule) : tactic bool := do r' ← of_prf r.id $ pf $ r, pure $ r = r'
+    meta def of_name (n : name) : tactic rule := resolve_name n >>= pure ∘ pexpr.mk_explicit >>= to_expr >>= rule.of_prf n
     meta def head_rewrite : rule → expr → tactic rule := λ r lhs, do
         T ← tactic.infer_type lhs,
         rhs ← tactic.mk_meta_var T,
@@ -82,7 +84,7 @@ namespace rule
                 -- result >>= trace,
                 pure ()
             ),  -- if new goals are created then tactic.fabricate will throw.
-        of_prf pf
+        of_prf r.id pf
 
     /--`match_rhs e r` matches `e` with `r.rhs` (ie, metavariables in r.rhs can be assigned) and returns the result. New goals might be present. -/
     -- meta def match_rhs : expr → rule → tactic unit
@@ -105,8 +107,7 @@ namespace rule
         let pf := specify_aux r.ctxt.length r.pf,
         let pf := specify_aux₂ rctxt pf, 
         infer_type pf, -- make sure it's valid
-        of_prf pf
-
+        of_prf r.id pf
 
     meta def lhs_pattern (r : rule) : tactic pattern := telescope.to_pattern r.ctxt r.lhs
 
@@ -116,10 +117,10 @@ namespace rule
         set_goals [res],
         ms ← apply_core r.pf {instances := ff},
         res ← instantiate_mvars res,
-        r ← rule.of_prf res,
+        r ← rule.of_prf r.id res,
         set_goals gs,
         pure (r, prod.snd <$> ms)
-    meta def instantiate_mvars (r : rule) : tactic rule := tactic.instantiate_mvars r.pf >>= rule.of_prf 
+    meta def instantiate_mvars (r : rule) : tactic rule := tactic.instantiate_mvars r.pf >>= rule.of_prf r.id
 
     meta def get_local_const_dependencies (r : rule) : tactic (list expr) := do
         pf ← tactic.instantiate_mvars r.pf,
@@ -129,7 +130,7 @@ namespace rule
     meta def is_local_hypothesis (r : rule) : tactic bool := do 
         lcds ← r.get_local_const_dependencies >>= list.mmap infer_type >>= list.mmap is_prop ,
     -- [HACK] I am assuming that there are no subtypings and so on which is probably a bad assumption.
-        pure $ list.any lcds id
+        pure $ list.foldl bor ff lcds
 
     meta def count_metas (r : rule) : tactic nat := do
         lhs ← tactic.instantiate_mvars r.lhs,

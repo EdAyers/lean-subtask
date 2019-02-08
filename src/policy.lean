@@ -16,9 +16,11 @@ def strong : ℕ := 3
 
 meta def requires_nonmeta_variable_that_is_already_present (r : rule) : M nat := do
     ce ← get_ce,
-    lhs_locals ← table.from_list <$> (list.mfilter ↑is_term $ list_local_consts $ r.lhs),
-    ce_locals ← table.from_list <$> (list.mfilter ↑is_term $ list_local_consts $ ce),
-    let result := table.is_empty $ lhs_locals ∩ ce_locals,
+    lhs_locals ← list_local_const_terms $ r.lhs,
+    rhs_locals ← list_local_const_terms $ r.rhs,
+    lhs_reqs ← pure $ list.filter (∉ rhs_locals) lhs_locals,
+    ce_locals ← list_local_const_terms $ ce,
+    let result := list.any ce_locals (∈ lhs_reqs),
     pure $ if result then weak else 0
 meta def requires_complex_term_that_is_already_present (r : rule) : M nat := do
     ce ← get_ce,
@@ -35,9 +37,8 @@ meta def requires_nonmeta_variable_present_in_rule (r : rule) : M nat := do
 -- meta def requires_complex_term_that_is_present_in_rule (r : rule) : M nat := do
      /- I feel like this one will just always be true. 
      A better refinement would be:  
-
      -/
---      
+     
 meta def score_rule (r : rule) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 

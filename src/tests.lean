@@ -5,7 +5,14 @@ section
 universe u
 open robot.vector_theory
 variables {A B : V → V} {x y z u v w : V} {μ ν: k} {a b c d e : k}
+
 example : (x + y) + z = (z + x) + y := 
+by equate
+example : x + (y - z) = -z + y + x := 
+by equate
+example : x - (y + z) = x - y - z := 
+by equate
+example : - (x - y) = y - x := 
 by equate
 --set_option pp.notation false
 example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
@@ -18,29 +25,35 @@ example : (a + c) * b = a * b + b * c :=
 by equate 
 example : (x + y) + (z + w) = (x + z) + (y + w) := 
 by equate
-lemma X : v + u + (x + y) + (z + w) = (x + z) + (y + w) + u + v := 
-begin (tactic.timetac "acrefl" tactic.ac_refl) end
-#print X
-lemma X1 : v + u + (x + y) + (z + w) = (x + z) + (y + w) + v + u := 
+example : v + u + (x + y) + (z + w) = (x + z) + (y + w) + v + u := 
 by equate
-#print X1
-lemma Y : x + y + z + u + v + w = w + (x + y + z + u + v)
-:= by (tactic.timetac "asdf" $ tactic.ac_refl)
-#print Y
-lemma Y1 : x + y + z + u + v + w = w + (x + y + z + u + v)
-:= by equate
-#print Y1 -- note the length difference with Y
+example : x + y + z + u + v + w = w + (x + y + z + u + v) := 
+by equate
 example (il : is_linear A) :
     μ • A (x) + ν • A (y) = A (μ • x + ν • y)  :=
 by equate 
+
 example (il : is_linear A) : 
+    ⟪A† (x + y) + w, z⟫ = ⟪A† x + A† y + w ,z⟫ := 
+by equate 
+example (il : is_linear A) :
+    ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
+:= by equate
+
+@[equate] lemma adj_linear (il : is_linear A) : 
     ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
 by equate 
+-- try the same two problems again but this time with the adjoint lemma.
+example (il : is_linear A) : 
+    ⟪A† (x + y) + w, z⟫ = ⟪A† x + A† y + w ,z⟫ := 
+by equate 
+example (il : is_linear A) :
+    ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
+:= by equate
 end
 section
     universe u
     variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y : G}
-    
     example 
         (l : ∀ x y, φ (x * y) = φ x * φ y) 
         (l2 : ∀ x y, ψ (x * y) = ψ x * ψ y) {x y : G} 
@@ -79,8 +92,8 @@ section
     @[equate] def A6l : (B ∩ C) ∪ A = (B ∪ A) ∩ (C ∪ A) := by equate
     @[equate] def A7l : (B ∪ C) ∩ A = (B ∩ A) ∪ (C ∩ A) := by equate
 
-    -- example : (A ∪ B) \ C = A \ C ∪ B \ C
-    -- := by equate
+    example : (A ∪ B) \ C = A \ C ∪ B \ C
+    := by equate
 end
 
 section

@@ -255,7 +255,7 @@ namespace zipper
         (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
         --tactic.infer_type pf' >>= trace,
         --trace pf',
-        r' ← rule.of_prf pf',
+        r' ← rule.of_prf r.id pf',
         --trace "hello",
         pure r'
 
