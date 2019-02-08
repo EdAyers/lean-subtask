@@ -3,9 +3,11 @@ namespace robot
 open strategy task tactic robot.tactic
 meta def strategy.merge : strategy → strategy → M strategy 
 |(Use r₁) (Use r₂) := do
-    unify r₁.lhs r₂.lhs,
-    unify r₁.rhs r₂.rhs, 
-    r ← rule.instantiate_mvars r₁,
+    r ← hypothetically' (do 
+        unify r₁.lhs r₂.lhs,
+        unify r₁.rhs r₂.rhs, 
+        rule.instantiate_mvars r₁
+    ),
     pure $ Use r
 |_ _ := failure
 
@@ -18,10 +20,9 @@ meta def task.test : expr → task → M bool
     matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e ,
     --trace_m "task.test: " $ matches,
     pure $ bnot matches.empty
-|ce t@(task.CreateAll e) := do
+|ce t@(task.CreateAll e) :=
     -- trace_m "task.test: " $ t,
-    o ← hypothetically (unify e ce), 
-    pure o.is_some
+    (hypothetically' (unify e ce *> pure tt)) <|> pure ff
 
 meta def hoist : task → strategy → M strategy
 |t s@(Use r₁) := do
@@ -29,21 +30,19 @@ meta def hoist : task → strategy → M strategy
     if passes then pure s else failure
 |_  _ := failure
 
-/-- Do In One Move. Check the lookahead table and see if any of the entries in there cause the task to be achieved. -/
+/-- Do In One Move. Check the lookahead table and see if any of 
+the entries in there cause the task to be achieved. -/
 meta def task.diom : task → M (list strategy) := λ t, do
     ce ← get_ce,
     lookahead ← get_lookahead,
     list.mcollect (λ r, do 
         let rhs := rule.rhs r,
         let pf := rule.pf r,
-        x : option rule ← M.hypothetically (do
+        M.hypothetically' (do
                 result ← task.test rhs t,
-                if result then pure r else failure
+                if result then pure () else failure
         ),
-        match x with
-        |(some r) := pure $ strategy.Use $ r
-        |none := failure
-        end
+        pure $ strategy.Use $ r
     ) lookahead
 
 meta def try_dioms : task → M refinement | t := do 

@@ -74,12 +74,13 @@ meta def prop_assumption : tactic unit := do
 
 open interaction_monad.result
 
-/--Perform `tac`, but throw away the state afterwards. -/
-meta def tactic.hypothetically {α} (tac : tactic α) : tactic (option α) :=
-λ s, match tac s with
-|(success a s') := (success (some a) s)
-|(exception ms pos s') := (success none s) 
-end
+-- /-- Perform `tac`, but throw away the state afterwards. 
+-- This is useful if you want to check something unifies but you don't want to assign the metavariables. -/
+-- meta def tactic.hypothetically {α} (tac : tactic α) : tactic (option α) :=
+-- λ s, match tac s with
+-- |(success a s') := (success (some a) s)
+-- |(exception ms pos s') := (success none s) 
+-- end
 
 meta def tactic.hypothetically' {α} (tac : tactic α) : tactic α :=
 λ s, match tac s with
@@ -89,6 +90,7 @@ end
 /-- `trace_m x y` is an alias for `((++) x) <$> pp y >>= trace` -/
 meta def tactic.trace_m {α} [has_to_tactic_format α]: string → α → tactic unit |s a := do ppa ← tactic.pp a, trace $ (to_fmt s) ++ ppa
 
+/--Try all of the tactics in the given list and return the result from the first one that doesn't fail. Don't do later tactics. -/
 meta def tactic.try_first {α} : list (tactic α) → tactic α
 | []            := failed
 | (tac :: tacs) := λ s,
@@ -97,12 +99,14 @@ meta def tactic.try_first {α} : list (tactic α) → tactic α
   | result.exception e p _ := tactic.try_first tacs s
   end
 
+/-- If it's a pi, lam or elet, get the body. -/
 meta def expr.binding_body_all : expr → option expr
 |(expr.pi _ _ _ b) :=  some b
 |(expr.lam _ _ _ b) := some b
 |(expr.elet _ _ _ b) :=some b
 |_ := none
 
+/-- Is it a pi, lambda, app or elet? -/
 meta def expr.is_composite : expr → bool
 := λ e, e.is_pi ∨ e.is_lambda ∨ e.is_app ∨ e.is_let
 
@@ -120,7 +124,6 @@ meta def expr.const_name : expr → option name
 |(expr.const n _) := some n
 |(expr.mvar unique pretty _) := some unique
 |_ := none
-
 
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
