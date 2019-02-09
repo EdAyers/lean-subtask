@@ -1,4 +1,6 @@
 import .engine .policy
+import algebra.group_power
+import tactic.ring
 /- A prototype version of the tactic. -/
 
 namespace robot
@@ -89,6 +91,9 @@ namespace ring_theory
     @[equate] def S2 : x * -y = - (x * y) := by simp
     @[equate] def D1 : x * (y + z) = (x * y) + (x * z) := by apply left_distrib
     @[equate] def D2 : (y + z) * x = y * x + z * x := by apply right_distrib
+    @[equate] def P1 : x ^ 0 = 1 := rfl
+    @[equate] def P2 {n} : x ^ (nat.succ n) = x * x ^ n := rfl
+    @[equate] def X2 : 2 * x = x + x  := by ring
 end ring_theory
 
 namespace set_rules
@@ -196,6 +201,6 @@ meta def equate (names : list name := []) := do
     base ← get_equate_rule_table,
     bonus ← rule_table.of_names names,
     all ← rule_table.join bonus base,
-    tactic.timetac "equate" $ robot.run robot.score_policy all
+    tactic.timetac "time: " $ robot.run robot.score_policy all
 
 end robot

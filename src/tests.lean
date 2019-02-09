@@ -14,7 +14,9 @@ example : x - (y + z) = x - y - z :=
 by equate
 example : - (x - y) = y - x := 
 by equate
---set_option pp.notation false
+-- set_option pp.numerals false
+-- [FIXME] The least_absent_subterm module has to be able to count previous times that a given subterm is used.
+example : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := by equate
 example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
 by equate
 example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
@@ -47,6 +49,12 @@ by equate
 example (il : is_linear A) : 
     ⟪A† (x + y) + w, z⟫ = ⟪A† x + A† y + w ,z⟫ := 
 by equate 
+example (il : is_linear A) :
+    ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
+:= by equate
+
+@[equate] lemma adj_linear_2 (il : is_linear A) : A†(x + y) = A†x + A†y := sorry
+
 example (il : is_linear A) :
     ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
 := by equate

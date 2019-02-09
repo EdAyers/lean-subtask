@@ -39,7 +39,7 @@ namespace submatch
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         current@(expr.app f₂ a₂) ← pure $ expr.instantiate_vars z.current $ ms.reverse,
         -- current ← instantiate_mvars current,
-        -- trace_m "submatch.run_app: " $ (e, z),
+        tactic.trace_m "submatch.run_app: " $ (e, z),
         -- wrap in a 'hypothetically'' to keep the old assignment table.
         -- this means that any mvars in `e` are never assigned. 
         tactic.hypothetically' (do 

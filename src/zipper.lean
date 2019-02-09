@@ -184,6 +184,8 @@ namespace zipper
     meta def unzip_with : expr → zipper → expr := λ e z, unzip $ z.set_current e
     meta def is_var : zipper → bool := expr.is_var ∘ current
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
+    /--True when the current expression does not contain local constants -/
+    meta def no_locals : zipper → bool := list.empty ∘ list_local_consts ∘ current 
     meta def is_local_constant : zipper → bool := expr.is_local_constant ∘ current
     meta def is_mvar : zipper → bool := expr.is_mvar ∘ current
     meta def is_terminal : zipper → bool := λ z, z.down = down_result.terminal
@@ -277,6 +279,9 @@ namespace zipper
     meta def down_proper (z : zipper) : tactic (expr × list zipper) := do
         let c := z.current,
         let f := expr.get_app_fn c,
+        let f_name := expr.const_name f,
+        -- if it is a numeral then don't expand it.
+        if f_name = `bit0 ∨ f_name = `bit1 then pure (f,[]) else do
         let args := expr.get_app_args c,
         params ← (fun_info.params <$> tactic.get_fun_info f (args.length)) <|> pure [],
         let params := list.reverse params,
@@ -356,10 +361,10 @@ namespace zipper
         try $ all_goals $ apply_instance <|> prop_assumption,
         pure ()
     
-    /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. -/
+    /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
-            if z.is_mvar || z.is_constant then failure else do 
+            if z.is_mvar || z.is_constant || z.no_locals then failure else do 
             let o := expr.occurs z.current l,
             matches ← zipper.maximal_monotone (λ rz, (tactic.hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
             -- trace_m "lus: " $ (z,l,o, matches),
