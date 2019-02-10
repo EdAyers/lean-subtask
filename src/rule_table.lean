@@ -89,7 +89,7 @@ namespace rule_table
     meta def join (r₁ r₂ : rule_table) : tactic rule_table := tabledict.mfold (λ rt _ r, insert r rt) r₂ $ head_table $ r₁
     meta def joins (l : list rule_table) :tactic rule_table := list.mfoldl (λ acc rt, join rt acc) (rule_table.empty) l
     meta def of_rules : list rule → tactic rule_table := list.mfoldl (function.swap insert) empty
-
+    meta def rules : rule_table → list rule := tabledict.to_list ∘ rule_table.head_table
     meta def of_names (ns : list name) : tactic rule_table := do
         rs ← ns.mmap rule.of_name,
         revs ← rs.mmap rule.flip,

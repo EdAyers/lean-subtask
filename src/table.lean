@@ -1,3 +1,4 @@
+import .util
 open expr
 open native
 
@@ -44,6 +45,7 @@ namespace table
     meta def any (p : α → bool) : table α → bool := option.is_none ∘ mfold (λ (x : unit) a, if p a then none else some ()) ()
     meta def filter (p : α → bool) : table α → table α := fold (λ t k, if p k then insert k t else t) empty
     meta def first : table α → option α := fold (λ o a, option.rec_on o (some a) some) none -- [HACK] highly inefficient but I can't see a better way given the interface.
+    meta def disjoint : table α → table α → bool := λ t₁ t₂, bnot $ any (λ a, contains a t₁) $ t₂
     meta instance [has_to_string α] : has_to_string (table α) := ⟨λ t, (λ s, "{|" ++ s ++ "|}") $ list.to_string $ to_list $ t⟩
     meta instance has_to_tactic_format [has_to_tactic_format α] : has_to_tactic_format (table α) := 
         ⟨λ t, do
@@ -133,6 +135,7 @@ namespace tabledict
     meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (tabledict κ α) := ⟨λ (d : dict κ (table α)), tactic.pp d⟩
     meta def fold {β} (f : β → κ → α → β) : β → tabledict κ α → β := dict.fold (λ b k, table.fold (λ b, f b k) b)
     meta def mfold {T} [monad T] {β} (f : β → κ → α → T β) : β → tabledict κ α → T β := dict.mfold (λ b k, table.mfold (λ b, f b k) b)
+    meta def to_list : tabledict κ α → list α := robot.list.collect (table.to_list ∘ prod.snd) ∘ dict.to_list
 end tabledict
 
 meta def listdict (κ : Type) (α : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] : Type := dict κ (list α)

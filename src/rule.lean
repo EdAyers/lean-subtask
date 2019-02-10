@@ -40,7 +40,12 @@ namespace rule
         := by apply_instance
 
     meta instance : has_to_string rule := ⟨λ r, (to_string r.lhs) ++ " = " ++ (to_string r.rhs)⟩
-    meta instance : has_to_tactic_format rule := ⟨λ r, infer_type r.pf >>= whnf >>= tactic_format_expr⟩
+    meta instance : has_to_tactic_format rule := 
+    ⟨λ r, do
+        plhs ← tactic.pp r.lhs, prhs ← tactic.pp r.rhs,
+        pure $ plhs ++ " = " ++ prhs
+    -- infer_type r.pf >>= whnf >>= tactic_format_expr
+    ⟩
 
     meta def of_prf (id : name) : expr → tactic rule := λ pf, do
         t ← infer_type pf >>= whnf,

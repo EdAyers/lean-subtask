@@ -1,4 +1,4 @@
-import .equate
+import ..equate
 open robot
 namespace tests
 section
@@ -77,10 +77,12 @@ end
 section
     universe u
     variables {H G : Type u} [group H] [add_comm_group G] {φ ψ: H → G} {x y : H}
+    def sum_hom (φ ψ : H → G) : H → G := λ x, φ(x) + ψ(x)
+    @[equate] def sum_hom_def : sum_hom φ ψ x = φ(x) + ψ(x) := rfl
     example
         (hφ : ∀ x y, φ (x * y) = φ x + φ y) 
         (hψ : ∀ x y, ψ (x * y) = ψ x + ψ y)
-        : φ (x * y) + ψ (x * y) = (φ (x) + ψ(x) )+ (φ(y) + ψ(y) ) :=
+        : sum_hom φ ψ (x * y) = sum_hom φ ψ x + sum_hom φ ψ y := 
     by equate
 end 
 -- -- set_option pp.notation false
@@ -92,7 +94,7 @@ section
     example : ( X \ B ) ∪ ( X \ C ) = X \ ( B ∩ C ) := 
     by equate
     example : ( X \ B ) \ C = X \ ( B ∪ C ) := 
-    by symmetry; equate
+    by equate
     example : X \ ( B ∪ C ) = ( X \ B ) \ C := 
     by equate
     example : (A ∪ B) \ A = B 

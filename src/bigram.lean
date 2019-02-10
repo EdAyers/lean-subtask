@@ -1,17 +1,16 @@
-import .rule .zipper
+import .rule .zipper .rule_table
 
 namespace robot
 --open ez ez.zipper
-/--[IDEA] tag bigrams with the direction between the upper and lower symbol. 
+/-[IDEA] tag bigrams with the direction between the upper and lower symbol. 
 `U` means that the bigram is unitary. 
 The `Comm` mode can be used to indicate that the direction doesn't matter. -/
-inductive dir | L | R | U | Comm
-
+--inductive dir | L | R | U | Comm
 /--A bigram is a pair of symbols (constants or local constants) appearing in a term. -/
 @[derive decidable_eq]
 meta structure bigram :=
-(t : expr)
-(b : expr)
+(t : name)
+(b : name)
 -- (dir : dir)
 
 meta def bigram.lt : bigram → bigram → bool := λ ⟨t₁,b₁⟩ ⟨t₂,b₂⟩, (t₁,b₁) < (t₂,b₂)
@@ -24,25 +23,34 @@ meta instance bigram.has_to_tactic_format : has_to_tactic_format bigram :=
 pure $ "⟮" ++ ppt ++ ", " ++ ppb ++ "⟯"⟩
 -- follows along with the SInE algorithm but on bigrams instead of individual symbols.
 
+namespace bigram
+
+-- meta def of_names : name → name → tactic bigram := λ n₁ n₂, do
+--     r₁ ← tactic.resolve_name n₁ >>= tactic.to_expr,
+--     r₂ ← tactic.resolve_name n₂ >>= tactic.to_expr,
+--     pure $ bigram.mk r₁ r₂
+
 def tolerance := 2
 def generality := 5
 def max_trigger_depth := 10
 open ez ez.zipper
 
-private meta def get_bigrams_aux : expr → mtable bigram → zipper → tactic (mtable bigram)
+private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic (mtable bigram)
 |t acc z := do
     (b,children) ← down_proper z,
-    if expr.is_constant b ∨ expr.is_local_constant b then
-        let acc := acc.insert ⟨t,b⟩ in
-        children.mfoldl (get_bigrams_aux b) acc
-    else pure acc
+    match expr.const_name b with
+    |(some n) :=
+        let acc := acc.insert ⟨t,n⟩ in
+        children.mfoldl (get_bigrams_aux n) acc
+    |none := pure acc
+    end
 
 meta def get_bigrams : expr → tactic (mtable bigram) := λ e, do
-    z ← pure $ zip $ e,
-    (t,children) ← down_proper z,
-    if t.is_constant ∨ t.is_local_constant then
-        children.mfoldl (get_bigrams_aux t) ∅
-    else pure ∅
+    (t,children) ← down_proper $ zip $ e,
+    match expr.const_name t with
+    |(some t) := children.mfoldl (get_bigrams_aux t) ∅
+    |none := pure ∅
+    end
 
 -- a bigram table; 
 
@@ -50,6 +58,9 @@ meta def get_bigrams : expr → tactic (mtable bigram) := λ e, do
 meta structure bigram_cache :=
 (trigs : tabledict bigram rule)
 (occs : mtable bigram)
+
+meta instance bigram_cache.has_to_tactic_format : has_to_tactic_format bigram_cache :=
+⟨λ x, do ppo ← tactic.pp x.occs, pure ppo⟩
 
 private meta def rare_test : mtable bigram → mtable bigram → bigram → bool
 |occs bs b := (occs(b) ≤ generality) ∨ bs.all (λ b' _, occs(b) ≤ tolerance * occs(b'))
@@ -68,13 +79,27 @@ meta def compute_bigram_cache : list rule → tactic bigram_cache := λ rs, do
 
 meta def distance_aux (bgc : bigram_cache) : table bigram → table bigram → table expr → ℕ → tactic ℕ
 |visited targets front n := do
+    tactic.trace_m "front: " $ front, 
+    tactic.trace_m "targets: " $ targets, 
     rares ← mtable.to_table <$> front.mfold (λ acc e, mtable.join acc <$> bgc.get_rares e) ∅,
     let rares := rares \ visited,
     let visited := visited ∪ rares,
+    if targets.any (λ z, rares.contains z) then pure n else do -- [HACK] remove this line to make algorithm clear ALL targets.
     let targets := targets \ rares,
     if targets.is_empty then pure n else
+    if front.is_empty then failure else
     if n > max_trigger_depth then failure else do
-    let front : table expr := rares.fold (λ front rare, table.fold (λ front r, front.insert $ rule.rhs r) front $ bgc.trigs.get rare) ∅,
+    front ← rares.mfold (λ front rare, do
+        triggers ← pure $ bgc.trigs.get rare,
+        tactic.trace_m "fold: " $ (rare,triggers),
+        table.mfold (λ front r, do
+            pure $ table.insert (rule.rhs r) $ front
+        ) front triggers
+    ) ∅,
+    let front : table expr := rares.fold (λ front rare, 
+            table.fold (λ front r, front.insert $ rule.rhs r) front 
+            $ bgc.trigs.get rare
+        ) ∅,
     distance_aux visited targets front (n+1) 
 
 meta def distance (bgc : bigram_cache) : expr → expr → tactic ℕ
@@ -82,8 +107,8 @@ meta def distance (bgc : bigram_cache) : expr → expr → tactic ℕ
     targets ← mtable.to_table <$> bgc.get_rares e₂,
     distance_aux bgc ∅ targets (table.singleton e₁) 0
 
+meta def of_rule_table : rule_table → tactic bigram_cache := compute_bigram_cache ∘ rule_table.rules 
 
-    
 
 
 
@@ -112,5 +137,7 @@ Idea 2: use the table `bigram ⇀ table rule`
 
 
  -/
+
+end bigram
 
 end robot
