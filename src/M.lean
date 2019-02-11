@@ -10,6 +10,7 @@ meta instance M.of_conv {α} : has_coe (conv α) (M α) := ⟨state_t.lift⟩
 meta def get_ce : M expr := state_t.lift (conv.lhs >>= instantiate_mvars)
 meta def get_rhs : M expr := state_t.lift (conv.rhs >>= instantiate_mvars)
 meta def get_lookahead : M (list rule) := state.lookahead <$> get
+meta def get_triggers : expr → M (table rule) := λ e , do bgc ← state.bgc <$> get, bigram.get_triggers bgc e
 meta def get_path : M _ := state.path <$> get
 meta def get_rule_table : M rule_table := state.rt <$> get
 meta def M.submatch (e : expr) : M (list rule) := do rt ← get_rule_table, rule_table.submatch e rt

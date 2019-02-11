@@ -65,6 +65,7 @@ namespace dict
     variable {α : Type}
     meta instance : has_sizeof (dict k α) := ⟨λ d, rb_map.size d⟩ 
     meta def empty : dict k α := rb_map.mk k α
+    meta def is_empty : dict k α → bool := rb_map.empty 
     meta instance : has_emptyc (dict k α) := ⟨empty⟩
     meta def insert : k → α → dict k α → dict k α := λ k a d, rb_map.insert d k a
     meta def get : k → dict k α → option α := λ k d, rb_map.find d k
@@ -160,10 +161,12 @@ meta def mtable (κ : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop
 namespace mtable
     variables {κ : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)]
     meta def empty : mtable κ := dict.empty
+    meta def is_empty : mtable κ → bool := dict.is_empty
     meta instance : has_emptyc (mtable κ) := ⟨empty⟩
     meta def get : κ → mtable κ → ℕ := dict.get_default 0
     meta def of_table : table κ → mtable κ := dict.map (λ x, 1) ∘ table.to_dict
     meta def insert : κ → mtable κ → mtable κ := dict.modify_default 0 nat.succ
+    meta instance : has_insert κ (mtable κ) := ⟨insert⟩
     meta def of_list : list κ → mtable κ := list.foldl (function.swap insert) ∅
     meta def erase : κ → mtable κ → mtable κ := dict.modify_when_present (λ x, x - 1)
     /--Reset the given key to zero. Contrast with erase which merely decrements the count. -/

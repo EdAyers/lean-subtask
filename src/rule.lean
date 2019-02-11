@@ -31,7 +31,7 @@ meta structure rule := -- relation is always `=` for now.
 (lhs  : expr) 
 (rhs  : expr)
 (type : expr)
-(pf   : expr) -- the proof expression of the given rule. Note that sometimes 
+(pf   : expr) -- the proof expression of the given rule.
 
 namespace rule
     meta instance has_lt : has_lt rule := ⟨λ r1 r2, (r1.lhs,r1.rhs) < (r2.lhs,r2.rhs)⟩
@@ -91,12 +91,15 @@ namespace rule
             ),  -- if new goals are created then tactic.fabricate will throw.
         of_prf r.id pf
 
-    /--`match_rhs e r` matches `e` with `r.rhs` (ie, metavariables in r.rhs can be assigned) and returns the result. New goals might be present. -/
+    /-`match_rhs e r` matches `e` with `r.rhs` (ie, metavariables in r.rhs can be assigned) and returns the result. New goals might be present. -/
     -- meta def match_rhs : expr → rule → tactic unit
     -- |e r := do
     --     notimpl
 
-    meta def is_wildcard : rule → bool := λ r, expr.is_var r.lhs || expr.is_mvar r.lhs
+    /--Returns true when the left hand side is a variable or metavariable. -/
+    meta def lhs_wildcard : rule → bool := λ r, expr.is_var r.lhs || expr.is_mvar r.lhs
+    /--Returns true when the right hand side is a variable or metavariable. -/
+    meta def rhs_wildcard : rule → bool := λ r, expr.is_var r.rhs || expr.is_mvar r.rhs
     private meta def specify_aux : nat → expr → expr
     |0 acc := acc
     |(n+1) acc := specify_aux n $ expr.app acc (expr.var n)

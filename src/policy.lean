@@ -58,7 +58,7 @@ meta def score_rule (r : rule) : M int := do
         if ¬ expr.is_composite r.lhs then pure ff else
             bnot 
             <$> list.empty 
-            <$> list.mcollect (λ x, 
+            <$> list.mchoose (λ x, 
                 state_t.lift 
                 $ tactic.hypothetically' 
                 $ (do 

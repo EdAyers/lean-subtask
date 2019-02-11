@@ -148,6 +148,7 @@ namespace zipper
     |⟨elet_assignment n t a b  :: p, ctxt,    e⟩ := some $ zipper.mk p ctxt $ expr.elet n t e b
     |⟨elet_body       n t a b  :: p, s::ctxt, e⟩ := some $ zipper.mk p ctxt $ expr.elet n t a e
     |_ := undefined_core $ "malformed expression zipper"
+    meta def is_top : zipper → bool := list.empty ∘ path
     meta def app_left : zipper → option zipper := λ z,
         match down z with
         |down_result.app l _ := some l
@@ -365,7 +366,7 @@ namespace zipper
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
             if z.is_mvar || z.is_constant || z.no_locals then failure else do 
-            let o := expr.occurs z.current l,
+            --let o := expr.occurs z.current l,
             matches ← zipper.maximal_monotone (λ rz, (tactic.hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
             -- trace_m "lus: " $ (z,l,o, matches),
             if ¬ matches.empty then failure else pure z

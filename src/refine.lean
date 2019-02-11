@@ -11,7 +11,6 @@ meta def strategy.merge : strategy → strategy → M strategy
     pure $ Use r
 |_ _ := failure
 
-
 meta def task.test : expr → task → M bool
 |ce (task.Create e) := do
     e ← instantiate_mvars e,
@@ -23,19 +22,33 @@ meta def task.test : expr → task → M bool
 |ce t@(task.CreateAll e) :=
     -- trace_m "task.test: " $ t,
     (hypothetically' (unify e ce *> pure tt)) <|> pure ff
-
+|ce t@(task.Annihilate x) :=
+    (ez.zipper.find_subterm x ce *> pure ff) <|> pure tt
+|ce t@(task.Create2 x) := do
+    subs ← ez.zipper.find_subterms x ce,
+    pure $ subs.length ≥ 2
+|ce t := notimpl
 meta def hoist : task → strategy → M strategy
 |t s@(Use r₁) := do
     passes ← task.test r₁.rhs t,
     if passes then pure s else failure
 |_  _ := failure
 
+-- -- automatically do moves which are 'cowild', that is, they just reduce to a variable.
+-- meta def simplify : M (list strategy) := λ t, do
+--     ce ← get_ce,
+--     lookahead ← get_lookahead,
+--     list.mchoose (λ r, 
+--         rule.lhs_wildcard
+--     ) lookahead
+
 /-- Do In One Move. Check the lookahead table and see if any of 
 the entries in there cause the task to be achieved. -/
 meta def task.diom : task → M (list strategy) := λ t, do
     ce ← get_ce,
     lookahead ← get_lookahead,
-    list.mcollect (λ r, do 
+    -- trace_m "diom: " $ lookahead,
+    list.mchoose (λ r, do 
         let rhs := rule.rhs r,
         let pf := rule.pf r,
         M.hypothetically' (do
@@ -58,7 +71,7 @@ meta def get_distance_reducer : expr → expr → M (rule)
     current_dist ← zipper.get_distance ce a b,
     -- trace_m "\ngdr: " $ (ce, current_dist),
     rs ← get_lookahead,
-    drs ← list.mcollect (λ r, (do
+    drs ← list.mchoose (λ r, (do
         new_dist ← zipper.get_distance (rule.rhs r) a b,
         -- trace_m "gdr: " $ (r.rhs, new_dist),
         pure (new_dist,r)
@@ -119,16 +132,38 @@ match t with
     submatches ← pure submatches, -- if use_comm then pure submatches else submatches.mfilter (λ z, bnot <$> rule.is_commuter z),
     -- [TODO] need a way of ignoring commutativity here. 
     -- trace_m "task.refine: " $ submatches,
-    strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule.is_wildcard r) $ submatches,
+    strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule.lhs_wildcard r) $ submatches,
     pure $ ([],rss ++ strats)
 |(task.CreateAll a) := do
     ce ← get_ce >>= lift instantiate_mvars,
     -- trace_m "refine CreateAll: " $ ce,
     scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
     -- trace_m "refine CreateAll: " $ scs,
-    if scs.length = 0 then notimpl else do
+    if scs.length = 0 then pure $ ([],[]) else do
+    -- if list.any scs (zipper.is_top)  then do 
+    --     rt ← get_rule_table,
+    --     hrws ← rule_table.head_rewrites_rhs a rt,
+    --     pure $ ([], strategy.Use <$> hrws)
+    -- else do
     let scs := task.Create <$> zipper.current <$> scs,
     pure $ (scs, [])
+|(task.Annihilate x) := do
+    ce ← get_ce, rt ← get_rule_table,
+    -- find all rules which will remove `x` from the face of the earth?
+    submatches ← rt.submatch x,
+    notimpl
+|(task.Merge x) := do
+    /- Find rules which will:
+        a. perform a factorisation such that `x` is factorised.
+        b. perform a straight merge such as `F(x) ∩ F(x) = F(x)` or `x + x = 2 * x`
+        c. annihilate one instance of `x`. For example `x * 0 = 0`. 
+
+        In general, this will produce too many bad candidates. 
+        You don't want `x ∩ x = x` to be seen as a good idea for a number problem, how to refine?
+        1. use n-gram triggers to suggest rules.
+        2. Use this subtask to refine sets of rules produced by other subtasks.
+    -/
+    notimpl
 end
 
 meta def strategy.execute : strategy → M unit

@@ -16,7 +16,6 @@ namespace submatch
     --     mv ← tactic.mk_meta_var y,
     --     intro_metas (mv::acc) rest
     -- |acc [] := pure acc
-    /--`run e s` attempts to unify `e` with the subterm of `s` and then returns a rule depending on fresh metavariables.-/
     -- meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do -- [TODO] return a `submatch_result` which also scores the match.
     --     gs ← get_goals,
     --     e_type ← infer_type e,
@@ -32,6 +31,8 @@ namespace submatch
     --     ms ← ms.mmap instantiate_mvars,
     --     set_goals gs,
     --     rule.of_prf $ expr.mk_app r.pf ms.reverse
+
+    /-- [HACK] run_app does the same thing as `run` except that sometimes the unifier doesn't try to unify the function and argument separately. -/
     meta def run_app : expr → submatch → tactic rule
     | e ⟨r,z⟩ := do
         (expr.app f a) ← pure e,
@@ -39,7 +40,7 @@ namespace submatch
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         current@(expr.app f₂ a₂) ← pure $ expr.instantiate_vars z.current $ ms.reverse,
         -- current ← instantiate_mvars current,
-        tactic.trace_m "submatch.run_app: " $ (e, z),
+        -- tactic.trace_m "submatch.run_app: " $ (e, z),
         -- wrap in a 'hypothetically'' to keep the old assignment table.
         -- this means that any mvars in `e` are never assigned. 
         tactic.hypothetically' (do 
@@ -49,7 +50,7 @@ namespace submatch
         ) 
         --trace_state,
 
-    
+    /--`run e s` attempts to unify `e` with the subterm of `s` and then returns a rule depending on fresh metavariables.-/
     meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do
         --e ← instantiate_mvars e,
         (mrule, ms) ← rule.to_mvars r,
@@ -92,7 +93,7 @@ namespace rule_table
     meta def rules : rule_table → list rule := tabledict.to_list ∘ rule_table.head_table
     meta def of_names (ns : list name) : tactic rule_table := do
         rs ← ns.mmap rule.of_name,
-        revs ← rs.mmap rule.flip,
+        revs ← list.mchoose (λ r, do ic ← rule.is_commuter r, if ic then failure else rule.flip r) rs,
         of_rules $ rs ++ revs
     private meta def get_head_rewrites : name → rule_table → table rule | k {head_table := ht, ..} := ht.get k
     meta structure rewrites_config :=
@@ -105,32 +106,31 @@ namespace rule_table
     
     meta def head_rewrites (lhs : expr) (rt : rule_table)  (cfg : rewrites_config := {}) : (tactic $ list rule) := do
         let k := get_key lhs,
-        kpp ← pp k,
         let wilds := if cfg.wilds then get_head_rewrites `rule_table.wildcard rt else ∅,
         let keyed := get_head_rewrites k rt,
         let t := wilds ∪ keyed,
-        tpp ← pp t,
-        --trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
+        -- kpp ← pp k, tpp ← pp t,
+        -- trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
         t.mfold (λ acc r, (do r ← rule.head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
 
-    private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) : zipper → list rule → tactic (list rule)
+    meta def head_rewrites_rhs (rhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := do
+        head_rewrites rhs rt >>= list.mmap rule.flip
+
+    private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) 
+    : zipper → list rule → tactic (list rule)
     |z acc := do
-        -- trace z,
         hrs ← head_rewrites z.current rt cfg,
-        -- trace head_rewrites,
-        hrs ← list.mcollect (λ rw, ez.zipper.apply_rule rw z) hrs,
-        --trace head_rewrites,
+        hrs ← list.mchoose (λ rw, ez.zipper.apply_rule rw z) hrs,
         acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,
-        --trace children,
         acc ← children.mfoldl (λ acc z, rewrites_aux z acc) acc,
         pure acc
 
-    -- [TODO] add a 'specificity score'. How likely is it that the given rule would match?
     -- [TODO] wildcard moves should have their own section, since one is constructed for each node in the tree.
-    -- [TODO] similarly, anti-annihilator moves (moves which have metas after matching) should be put in their own section. If my understanding of Lean is correct, it should be possible to simply add these as metavariables to the tactic state.
+    -- [TODO] similarly, anti-annihilator moves (moves which have metas after matching) should be put in their own section.
 
-    meta def rewrites (lhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := rewrites_aux rt cfg (zipper.zip lhs) []
+    meta def rewrites (lhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := 
+    rewrites_aux rt cfg (zipper.zip lhs) []
 
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
@@ -138,10 +138,9 @@ namespace rule_table
     meta def submatch : expr → rule_table → tactic (list rule) | e rt :=
         let key := get_key e in
         let submatches := rt.submatch_table.get key in
-        if (key = `rule_table.app ) then list.mcollect (robot.submatch.run_app e) submatches
-        else 
-        -- trace_m "submatch: " $ submatches,
-        list.mcollect (robot.submatch.run e) submatches
+        if (key = `rule_table.app) 
+        then list.mchoose (robot.submatch.run_app e) submatches
+        else list.mchoose (robot.submatch.run e) submatches
 
 end rule_table
 

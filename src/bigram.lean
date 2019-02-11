@@ -8,10 +8,17 @@ The `Comm` mode can be used to indicate that the direction doesn't matter. -/
 --inductive dir | L | R | U | Comm
 /--A bigram is a pair of symbols (constants or local constants) appearing in a term. -/
 @[derive decidable_eq]
+
+-- meta inductive gram
+-- |Single (n : name)
+-- |Bigram (t b : name)
+
 meta structure bigram :=
 (t : name)
 (b : name)
 -- (dir : dir)
+
+
 
 meta def bigram.lt : bigram → bigram → bool := λ ⟨t₁,b₁⟩ ⟨t₂,b₂⟩, (t₁,b₁) < (t₂,b₂)
 meta instance bigram.has_lt : has_lt bigram := ⟨λ x y , bigram.lt x y⟩
@@ -22,6 +29,17 @@ meta instance bigram.has_to_tactic_format : has_to_tactic_format bigram :=
 ⟨λ ⟨t,b⟩, do ppt ← tactic.pp t, ppb ← tactic.pp b, 
 pure $ "⟮" ++ ppt ++ ", " ++ ppb ++ "⟯"⟩
 -- follows along with the SInE algorithm but on bigrams instead of individual symbols.
+
+/-- The bigram_cache consists of:
+- `occs` a table with the number of times that particular bigrams occur.
+- `trigs` a table containing rules which are triggered by certain bigrams.
+    A rule is triggered by a bigram when the rule's LHS contains that bigram and there are no 
+-/
+meta structure bigram_cache :=
+(trigs : tabledict bigram rule)
+(occs : mtable bigram)
+meta instance bigram_cache.has_to_tactic_format : has_to_tactic_format bigram_cache :=
+⟨λ x, do ppo ← tactic.pp x.occs, pure ppo⟩
 
 namespace bigram
 
@@ -48,24 +66,19 @@ private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic 
 meta def get_bigrams : expr → tactic (mtable bigram) := λ e, do
     (t,children) ← down_proper $ zip $ e,
     match expr.const_name t with
-    |(some t) := children.mfoldl (get_bigrams_aux t) ∅
+    |(some t) := do 
+        bgs ← children.mfoldl (get_bigrams_aux t) ∅,
+        pure $ if bgs.is_empty then {bigram.mk t name.anonymous} else bgs
     |none := pure ∅
     end
 
--- a bigram table; 
 
 
-meta structure bigram_cache :=
-(trigs : tabledict bigram rule)
-(occs : mtable bigram)
-
-meta instance bigram_cache.has_to_tactic_format : has_to_tactic_format bigram_cache :=
-⟨λ x, do ppo ← tactic.pp x.occs, pure ppo⟩
 
 private meta def rare_test : mtable bigram → mtable bigram → bigram → bool
 |occs bs b := (occs(b) ≤ generality) ∨ bs.all (λ b' _, occs(b) ≤ tolerance * occs(b'))
 
-meta def bigram_cache.get_rares (bc : bigram_cache) : expr → tactic ( mtable bigram )
+meta def get_rares (bc : bigram_cache) : expr → tactic ( mtable bigram )
 |e := do bs ← get_bigrams e, pure $ bs.filter $ rare_test bc.occs bs
 
 meta def compute_bigram_cache : list rule → tactic bigram_cache := λ rs, do
@@ -77,38 +90,50 @@ meta def compute_bigram_cache : list rule → tactic bigram_cache := λ rs, do
     ) ∅,
     pure $ {trigs := trigs, occs := occs}
 
-meta def distance_aux (bgc : bigram_cache) : table bigram → table bigram → table expr → ℕ → tactic ℕ
-|visited targets front n := do
-    tactic.trace_m "front: " $ front, 
-    tactic.trace_m "targets: " $ targets, 
-    rares ← mtable.to_table <$> front.mfold (λ acc e, mtable.join acc <$> bgc.get_rares e) ∅,
+meta def trigger_traverse_aux {α} (bgc : bigram_cache) (f : ℕ → α → rule → tactic α) : table bigram → α → table expr → ℕ → tactic α
+|visited acc front 0 := pure acc
+|visited acc front (n+1) := do
+    rares ← mtable.to_table <$> front.mfold (λ acc e, mtable.join acc <$> get_rares bgc e) ∅,
     let rares := rares \ visited,
     let visited := visited ∪ rares,
-    if targets.any (λ z, rares.contains z) then pure n else do -- [HACK] remove this line to make algorithm clear ALL targets.
-    let targets := targets \ rares,
-    if targets.is_empty then pure n else
-    if front.is_empty then failure else
-    if n > max_trigger_depth then failure else do
-    front ← rares.mfold (λ front rare, do
+    if rares.is_empty then pure acc else do
+    ⟨front,acc⟩ ← rares.mfold (λ p rare, do
         triggers ← pure $ bgc.trigs.get rare,
-        tactic.trace_m "fold: " $ (rare,triggers),
-        table.mfold (λ front r, do
-            pure $ table.insert (rule.rhs r) $ front
-        ) front triggers
-    ) ∅,
-    let front : table expr := rares.fold (λ front rare, 
-            table.fold (λ front r, front.insert $ rule.rhs r) front 
-            $ bgc.trigs.get rare
-        ) ∅,
-    distance_aux visited targets front (n+1) 
+        table.mfold (λ p r, do
+            acc ← f n (prod.snd p) r,
+            pure $ (table.insert (rule.rhs r) p.1, acc)
+        ) p triggers
+    ) ⟨∅,acc⟩,
+    trigger_traverse_aux visited acc front n
 
-meta def distance (bgc : bigram_cache) : expr → expr → tactic ℕ
-|e₁ e₂ := do 
-    targets ← mtable.to_table <$> bgc.get_rares e₂,
-    distance_aux bgc ∅ targets (table.singleton e₁) 0
+meta def trigger_traverse {α} (bgc : bigram_cache) (f : ℕ → α → rule → tactic α) : expr → ℕ → α → tactic α
+|e n a := trigger_traverse_aux bgc f ∅ a {e} n
+
+meta def get_triggers (bgc : bigram_cache) : expr → tactic (table rule)
+| e := trigger_traverse bgc (λ _ t r, pure $ table.insert r t) e max_trigger_depth ∅
+
+-- meta def distance_aux (bgc : bigram_cache) : table bigram → table bigram → table expr → ℕ → tactic ℕ
+-- |visited targets front n := do
+--     tactic.trace_m "front: " $ front, 
+--     tactic.trace_m "targets: " $ targets, 
+--     rares ← mtable.to_table <$> front.mfold (λ acc e, mtable.join acc <$> bgc.get_rares e) ∅,
+--     let rares := rares \ visited,
+--     let visited := visited ∪ rares,
+--     if targets.any (λ z, rares.contains z) then pure n else do -- [HACK] remove this line to make algorithm clear ALL targets.
+--     let targets := targets \ rares,
+--     if targets.is_empty then pure n else
+--     if front.is_empty then failure else
+--     if n > max_trigger_depth then failure else do
+
+--     distance_aux visited targets front (n+1) 
+
+-- meta def distance (bgc : bigram_cache) : expr → expr → tactic ℕ
+-- |e₁ e₂ := do 
+--     targets ← mtable.to_table <$> bgc.get_rares e₂,
+--     distance_aux bgc ∅ targets (table.singleton e₁) 0
 
 meta def of_rule_table : rule_table → tactic bigram_cache := compute_bigram_cache ∘ rule_table.rules 
-
+meta def empty : bigram_cache := ⟨∅,∅⟩
 
 
 

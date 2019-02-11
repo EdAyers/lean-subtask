@@ -27,6 +27,8 @@ namespace group_theory
     @[equate] def NR : x * x ⁻¹ = 1 := by apply mul_right_inv
     @[equate] def IR : 1 * x = x := by apply one_mul
     @[equate] def IL : x * 1 = x := by apply mul_one
+    @[equate] def II: (x * y)⁻¹ = y⁻¹ * x⁻¹ := by simp
+    @[equate] def inv_inv : x ⁻¹ ⁻¹ = x := by simp
 
     --@[equate] def is_hom {G H : Type u} [group G] [group H] (f : G → H) := ∀ x y, f (x * y) = f x * f y
     
@@ -76,6 +78,7 @@ namespace add_grp_theory
     @[equate] def A3L : 0 + x = x := by apply zero_add
     @[equate] def A3R : x + 0 = x := by apply add_zero
     @[equate] def A3Z : x - 0 = x := by simp
+    @[equate] def minusminus : - - x= x := by simp
     @[equate] def A4 : x + y = y + x := by apply add_comm
     --@[equate] def is_hom (f : A → B) := ∀ a₁ a₂, f (a₁ + a₂) = f a₁ + f a₂
 end add_grp_theory

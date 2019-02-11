@@ -12,7 +12,11 @@ example : x + (y - z) = -z + y + x :=
 by equate
 example : x - (y + z) = x - y - z := 
 by equate
+example : - (x - y) = y + - x := 
+by equate
 example : - (x - y) = y - x := 
+by equate
+example : (x - y) = -(y - x) := 
 by equate
 -- set_option pp.numerals false
 -- [FIXME] The least_absent_subterm module has to be able to count previous times that a given subterm is used.
@@ -42,6 +46,10 @@ example (il : is_linear A) :
     ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
 := by equate
 
+example (il : is_linear A) : 
+    ⟪A† x + A† y ,z⟫ = ⟪A† (x + y), z⟫ := 
+by equate 
+
 @[equate] lemma adj_linear (il : is_linear A) : 
     ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 
 by equate 
@@ -61,7 +69,13 @@ example (il : is_linear A) :
 end
 section
     universe u
-    variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y : G}
+    variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y z : G}
+    example : x * y = (x * z) * (z⁻¹ * y)
+    := by equate
+    example : x * y⁻¹ = (y * x⁻¹)⁻¹
+    := by equate
+    example :  (y * x⁻¹)⁻¹ = x * y⁻¹
+    := by equate
     example 
         (l : ∀ x y, φ (x * y) = φ x * φ y) 
         (l2 : ∀ x y, ψ (x * y) = ψ x * ψ y) {x y : G} 
@@ -72,7 +86,7 @@ section
         (i1 : ∀ x, φ(ψ x) = x) 
         (i2 : ∀ x, ψ(φ x) = x) {x y : G} 
         : ψ (x * y) = ψ x * ψ y :=
-    by equate
+    by equate 
 end
 section
     universe u
@@ -103,6 +117,8 @@ section
     @[equate] def A7l : (B ∪ C) ∩ A = (B ∩ A) ∪ (C ∩ A) := by equate
 
     example : (A ∪ B) \ C = A \ C ∪ B \ C
+    := by equate
+    example : A \ C ∪ B \ C = (A ∪ B) \ C 
     := by equate
 end
 

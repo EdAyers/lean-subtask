@@ -138,11 +138,12 @@ meta def expr.is_term (e : expr) : tactic bool
 meta def list_local_const_terms (e : expr) : tactic (list expr) 
 := mfilter expr.is_term $ list_local_consts e
 
-def list.mcollect {T} [alternative T] (f : α → T β) : list α → T (list β)
+/-- Run `f` on each element in the list, return a new list with the values which didn't fail. -/
+def list.mchoose {T} [alternative T] (f : α → T β) : list α → T (list β)
 |[] := pure []
 |(h::t) := pure (λ fh rest, option.cases_on fh rest (λ fh,fh::rest)) 
             <*> (some <$> f h <|> pure none) 
-            <*> list.mcollect t
+            <*> list.mchoose t
 
 private meta def list.partition_many_aux {α} (equ : α → α → bool) : list α → list (list α) → list (list α) 
 |(h::t) acc := let ⟨eqs,non_eqs⟩ := list.partition (λ x, equ h x) t in list.partition_many_aux non_eqs (eqs :: acc)

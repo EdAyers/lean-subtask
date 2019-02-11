@@ -127,7 +127,8 @@ meta def run (π : policy) (rt : rule_table) : conv unit := do
     rt ← add_hyp_rules rt,
     (_,lhs, rhs) ← target_lhs_rhs,
     lookahead ← rt.rewrites lhs,
-    let s : state := { lookahead := lookahead, rt := rt, path := []},
+    bigrams ← pure $ bigram.empty, -- bigram.of_rule_table rt, -- [FIXME] adds a second to the runtime which is too slow.
+    let s : state := { lookahead := lookahead, rt := rt, path := [], bgc := bigrams},
     let t := task.CreateAll rhs,
     ⟨r,s⟩ ← state_t.run (explore $ zip $ tree.branch (tree_entry.task t []) []) s,
     run_aux π s r 20
