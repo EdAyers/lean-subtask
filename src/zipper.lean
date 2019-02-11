@@ -253,14 +253,14 @@ namespace zipper
         ),
         pure (rhs',pf')
     
-    meta def apply_rule : rule → zipper → tactic rule := λ r z, do
-        r ← r.head_rewrite z.current,
-        (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
-        --tactic.infer_type pf' >>= trace,
-        --trace pf',
-        r' ← rule.of_prf r.id pf',
-        --trace "hello",
-        pure r'
+    -- meta def apply_rule : rule → zipper → tactic rule := λ r z, do
+    --     r ← r.head_rewrite z.current,
+    --     (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
+    --     --tactic.infer_type pf' >>= trace,
+    --     --trace pf',
+    --     r' ← rule.of_prf r.id pf',
+    --     --trace "hello",
+    --     pure r'
 
     meta def apply_conv : conv unit → zipper → conv unit := λ cnv z, do
         let lhs := z.current,
@@ -348,19 +348,19 @@ namespace zipper
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
-    meta def rewrite_conv (r : rule) : conv unit := do	
-        lhs ← conv.lhs >>= instantiate_mvars,
-        sub ← instantiate_mvars r.lhs,
-        l ← ez.zipper.find_occurences (zip lhs) r.lhs,
-        -- trace_m "rewrite_conv: " $ (lhs,r, l),
-        (z::rest) ← pure l,
-        r ← apply_rule r z,
-        transitivity,
-        apply r.pf,
+    -- meta def rewrite_conv (r : rule) : conv unit := do	
+    --     lhs ← conv.lhs >>= instantiate_mvars,
+    --     sub ← instantiate_mvars r.lhs,
+    --     l ← ez.zipper.find_occurences (zip lhs) r.lhs,
+    --     -- trace_m "rewrite_conv: " $ (lhs,r, l),
+    --     (z::rest) ← pure l,
+    --     r ← apply_rule r z,
+    --     transitivity,
+    --     apply r.pf,
         
-        --trace_state, trace r,
-        try $ all_goals $ apply_instance <|> prop_assumption,
-        pure ()
+    --     --trace_state, trace r,
+    --     try $ all_goals $ apply_instance <|> prop_assumption,
+    --     pure ()
     
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=

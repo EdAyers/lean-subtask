@@ -75,21 +75,21 @@ namespace rule
     -- meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
     meta def is_wf (r : rule) : tactic bool := do r' ← of_prf r.id $ pf $ r, pure $ r = r'
     meta def of_name (n : name) : tactic rule := resolve_name n >>= pure ∘ pexpr.mk_explicit >>= to_expr >>= rule.of_prf n
-    meta def head_rewrite : rule → expr → tactic rule := λ r lhs, do
-        T ← tactic.infer_type lhs,
-        rhs ← tactic.mk_meta_var T,
-        target ← tactic.mk_app `eq [lhs,rhs],
-        pf ← tactic.fabricate target ( do
-                lhspp ← pp lhs,
-                rulepp ← pp r,
-                --trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
-                tactic.apply_core r.pf,
-                all_goals $ try (apply_instance <|> prop_assumption), -- clean up typeclass instances.
-                --trace_state,
-                -- result >>= trace,
-                pure ()
-            ),  -- if new goals are created then tactic.fabricate will throw.
-        of_prf r.id pf
+    -- meta def head_rewrite : rule → expr → tactic rule := λ r lhs, do
+    --     T ← tactic.infer_type lhs,
+    --     rhs ← tactic.mk_meta_var T,
+    --     target ← tactic.mk_app `eq [lhs,rhs],
+    --     pf ← tactic.fabricate target ( do
+    --             lhspp ← pp lhs,
+    --             rulepp ← pp r,
+    --             --trace $ ("rewriting " : format) ++ lhspp ++" with " ++ rulepp,
+    --             tactic.apply_core r.pf,
+    --             all_goals $ try (apply_instance <|> prop_assumption), -- clean up typeclass instances.
+    --             --trace_state,
+    --             -- result >>= trace,
+    --             pure ()
+    --         ),  -- if new goals are created then tactic.fabricate will throw.
+    --     of_prf r.id pf
 
     /-`match_rhs e r` matches `e` with `r.rhs` (ie, metavariables in r.rhs can be assigned) and returns the result. New goals might be present. -/
     -- meta def match_rhs : expr → rule → tactic unit

@@ -1,5 +1,5 @@
 
-import .table .rule .zipper
+import .table .rule_app .zipper
 open tactic ez
 namespace robot
 
@@ -104,23 +104,23 @@ namespace rule_table
     -- [TODO] optimise so that there are some type/typeclass checks on it.
     -- (annihilators := ff) [TODO]
     
-    meta def head_rewrites (lhs : expr) (rt : rule_table)  (cfg : rewrites_config := {}) : (tactic $ list rule) := do
+    meta def head_rewrites (lhs : expr) (rt : rule_table)  (cfg : rewrites_config := {}) : (tactic $ list rule_app) := do
         let k := get_key lhs,
         let wilds := if cfg.wilds then get_head_rewrites `rule_table.wildcard rt else ∅,
         let keyed := get_head_rewrites k rt,
         let t := wilds ∪ keyed,
         -- kpp ← pp k, tpp ← pp t,
         -- trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
-        t.mfold (λ acc r, (do r ← rule.head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
+        t.mfold (λ acc r, (do r ← head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
 
-    meta def head_rewrites_rhs (rhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := do
-        head_rewrites rhs rt >>= list.mmap rule.flip
+    -- meta def head_rewrites_rhs (rhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := do
+    --     head_rewrites rhs rt >>= list.mmap rule.flip
 
     private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) 
-    : zipper → list rule → tactic (list rule)
+    : zipper → list rule_app → tactic (list rule_app)
     |z acc := do
         hrs ← head_rewrites z.current rt cfg,
-        hrs ← list.mchoose (λ rw, ez.zipper.apply_rule rw z) hrs,
+        -- hrs ← list.mchoose (λ rw, head_rewrite rw z) hrs,
         acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,
         acc ← children.mfoldl (λ acc z, rewrites_aux z acc) acc,
@@ -129,7 +129,7 @@ namespace rule_table
     -- [TODO] wildcard moves should have their own section, since one is constructed for each node in the tree.
     -- [TODO] similarly, anti-annihilator moves (moves which have metas after matching) should be put in their own section.
 
-    meta def rewrites (lhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := 
+    meta def rewrites (lhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule_app) := 
     rewrites_aux rt cfg (zipper.zip lhs) []
 
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩

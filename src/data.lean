@@ -106,7 +106,7 @@ meta def task_zipper := tree.zipper tree_entry
 notation `Z` := task_zipper
 
 meta structure state :=
-(lookahead : list rule)
+(lookahead : list rule_app)
 (path : list expr)
 (rt : rule_table)
 (bgc : bigram_cache)
