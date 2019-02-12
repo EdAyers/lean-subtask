@@ -2,6 +2,20 @@
 import .util .rule
 namespace ez
 open robot
+
+@[derive decidable_eq]
+meta inductive address_item 
+|app_left
+|app_right
+|lam_var_type
+|lam_body
+|pi_var_type
+|pi_body
+|elet_type
+|elet_assignment
+|elet_body
+meta def address := list address_item
+meta instance address.has_append : has_append address := ⟨list.append⟩
 @[derive decidable_eq]
 meta inductive path
 |app_left        (left : unit) (right : expr) : path
@@ -14,12 +28,34 @@ meta inductive path
 |elet_assignment (var_name : name) (type : expr) (assignment : unit)    (body : expr) : path
 |elet_body       (var_name : name) (type : expr) (assignment : expr)    (body : unit) : path
 
+meta def path.to_address_item : path → address_item
+|(path.app_left _ _) := address_item.app_left
+|(path.app_right _ _) := address_item.app_right
+|(path.lam_var_type _ _ _ _) := address_item.lam_var_type
+|(path.lam_body _ _ _ _) := address_item.lam_body
+|(path.pi_var_type _ _ _ _) := address_item.pi_var_type
+|(path.pi_body _ _ _ _) := address_item.pi_body
+|(path.elet_type _ _ _ _) := address_item.elet_type
+|(path.elet_assignment _ _ _ _) := address_item.elet_assignment
+|(path.elet_body _ _ _ _) := address_item.elet_body
+
+meta def path.to_address : list path → address := list.map path.to_address_item ∘ list.reverse
+
 /-- A context entry. -/
 @[derive decidable_eq]
 meta inductive src
 |Hyp      (n : name) (bi : binder_info) (type : expr)  : src
 |Assigned (n : name) (type : expr) (assignment : expr) : src
 -- |Meta     (n : name) (type : expr)                     : src
+
+meta def path.to_src : path → option src
+|(path.lam_body n bi y b) := some $ src.Hyp n bi y
+|(path.pi_body n bi y b) := some $ src.Hyp n bi y
+|(path.elet_body n y a b) := some $ src.Assigned n y a
+|_ := none
+
+meta def path.to_context : list path → list src := list.choose path.to_src
+
 namespace src
     meta def type : src → expr
     |(Hyp _ _ t) := t
@@ -103,7 +139,7 @@ Reference: [Functional Pearl - The Zipper](https://www.st.cs.uni-saarland.de/edu
 @[derive decidable_eq]
 meta structure zipper :=
 (path : list path)
-(ctxt : list src)
+-- (ctxt : list src)
 (current : expr)
 
 @[derive decidable_eq]
@@ -125,63 +161,86 @@ namespace zipper
     open path
     /--Move the cursor down the expression tree.-/
     meta def down : zipper → down_result
-    |⟨p,ctxt, expr.app f a⟩ := down_result.app ⟨app_left () a :: p, ctxt, f⟩ ⟨app_right f () :: p, ctxt, a⟩
-    |⟨p,ctxt, expr.lam vn bi vt b⟩ := down_result.lam vn bi ⟨lam_var_type vn bi () b :: p, ctxt, vt⟩ ⟨lam_body vn bi vt () :: p, (src.Hyp vn bi vt)::ctxt, b⟩
-    |⟨p,ctxt, expr.pi  vn bi vt b⟩ := down_result.pi  vn bi ⟨pi_var_type  vn bi () b :: p, ctxt, vt⟩ ⟨pi_body  vn bi vt () :: p, (src.Hyp vn bi vt)::ctxt, b⟩
-    |⟨p,ctxt, expr.elet n t a b⟩ := 
+    |⟨p, expr.app f a⟩ := down_result.app ⟨app_left () a :: p,  f⟩ ⟨app_right f () :: p,  a⟩
+    |⟨p, expr.lam vn bi vt b⟩ := down_result.lam vn bi ⟨lam_var_type vn bi () b :: p,  vt⟩ ⟨lam_body vn bi vt () :: p,  b⟩
+    |⟨p, expr.pi  vn bi vt b⟩ := down_result.pi  vn bi ⟨pi_var_type  vn bi () b :: p,  vt⟩ ⟨pi_body  vn bi vt () :: p,  b⟩
+    |⟨p, expr.elet n t a b⟩ := 
         down_result.elet n 
-            ⟨elet_type n () a b :: p, ctxt, t⟩ 
-            ⟨elet_assignment n t () b :: p, ctxt, a⟩ 
-            ⟨elet_body n t a () :: p, (src.Assigned n t a)::ctxt, b⟩ 
-    |⟨p,ctxt,e⟩ := down_result.terminal
+            ⟨elet_type n () a b :: p,  t⟩ 
+            ⟨elet_assignment n t () b :: p,  a⟩ 
+            ⟨elet_body n t a () :: p, b⟩ 
+    |⟨p,e⟩ := down_result.terminal
+    meta def down_coord : address_item → zipper → option zipper
+    |(address_item.app_left)        ⟨p,expr.app f a⟩      := some ⟨app_left () a            :: p, f⟩
+    |(address_item.app_right)       ⟨p,expr.app f a⟩      := some ⟨app_right f ()           :: p, a⟩
+    |(address_item.lam_var_type)    ⟨p,expr.lam n bi y b⟩ := some ⟨lam_var_type n bi () b   :: p, y⟩ 
+    |(address_item.lam_body)        ⟨p,expr.lam n bi y b⟩ := some ⟨lam_body n bi y ()       :: p, b⟩
+    |(address_item.pi_var_type)     ⟨p,expr.pi n bi y b⟩  := some ⟨pi_var_type  n bi () b   :: p, y⟩ 
+    |(address_item.pi_body)         ⟨p,expr.pi n bi y b⟩  := some ⟨pi_body  n bi y ()       :: p, b⟩
+    |(address_item.elet_type)       ⟨p,expr.elet n y a b⟩ := some ⟨elet_type n () a b       :: p, y⟩ 
+    |(address_item.elet_assignment) ⟨p,expr.elet n y a b⟩ := some ⟨elet_assignment n y () b :: p, a⟩ 
+    |(address_item.elet_body)       ⟨p,expr.elet n y a b⟩ := some ⟨elet_body n y a ()       :: p, b⟩ 
+    |_ _ := none
+
     meta def children : zipper → list zipper := down_result.children ∘ down
-    /--Pop the cursor up the expression tree. If we are already at the top, returns `none`. [NOTE] This can throw if the zipper was not formed properly.-/
+
+    /-- Pop the cursor up the expression tree. If we are already at the top, returns `none`. 
+    [NOTE] This can throw if the zipper was not formed properly.
+    -/
     meta def up : zipper → option zipper
-    |⟨[],                            ctxt,    e⟩ := none
-    |⟨app_left  () a           :: p, ctxt,    f⟩ := some $ zipper.mk p ctxt $ expr.app f a
-    |⟨app_right f  ()          :: p, ctxt,    a⟩ := some $ zipper.mk p ctxt $ expr.app f a
-    |⟨lam_var_type vn bi vt b  :: p, ctxt,    e⟩ := some $ zipper.mk p ctxt $ expr.lam vn bi e b
-    |⟨lam_body     vn bi vt b  :: p, s::ctxt, e⟩ := some $ zipper.mk p ctxt $ expr.lam vn bi vt e 
-    |⟨pi_var_type  vn bi vt b  :: p, ctxt,    e⟩ := some $ zipper.mk p ctxt $ expr.pi vn bi e b
-    |⟨pi_body      vn bi vt b  :: p, s::ctxt, e⟩ := some $ zipper.mk p ctxt $ expr.pi vn bi vt e
-    |⟨elet_type       n t a b  :: p, ctxt,    e⟩ := some $ zipper.mk p ctxt $ expr.elet n e a b
-    |⟨elet_assignment n t a b  :: p, ctxt,    e⟩ := some $ zipper.mk p ctxt $ expr.elet n t e b
-    |⟨elet_body       n t a b  :: p, s::ctxt, e⟩ := some $ zipper.mk p ctxt $ expr.elet n t a e
-    |_ := undefined_core $ "malformed expression zipper"
+    |⟨[],                            e⟩ := none
+    |⟨app_left  () a           :: p, f⟩ := some $ zipper.mk p $ expr.app f a
+    |⟨app_right f  ()          :: p, a⟩ := some $ zipper.mk p $ expr.app f a
+    |⟨lam_var_type vn bi vt b  :: p, e⟩ := some $ zipper.mk p $ expr.lam vn bi e b
+    |⟨lam_body     vn bi vt b  :: p, e⟩ := some $ zipper.mk p $ expr.lam vn bi vt e 
+    |⟨pi_var_type  vn bi vt b  :: p, e⟩ := some $ zipper.mk p $ expr.pi vn bi e b
+    |⟨pi_body      vn bi vt b  :: p, e⟩ := some $ zipper.mk p $ expr.pi vn bi vt e
+    |⟨elet_type       n t a b  :: p, e⟩ := some $ zipper.mk p $ expr.elet n e a b
+    |⟨elet_assignment n t a b  :: p, e⟩ := some $ zipper.mk p $ expr.elet n t e b
+    |⟨elet_body       n t a b  :: p, e⟩ := some $ zipper.mk p $ expr.elet n t a e
+    -- |_ := undefined_core $ "malformed expression zipper"
     meta def is_top : zipper → bool := list.empty ∘ path
-    meta def app_left : zipper → option zipper := λ z,
-        match down z with
-        |down_result.app l _ := some l
-        |_ := none
-        end 
-    meta def app_right : zipper → option zipper := λ z,
-        match down z with
-        |down_result.app _ r := some r
-        |_ := none
-        end 
-    meta def body : zipper → option zipper := λ z,
+    meta def top := option.repeat up
+    meta def down_app_left : zipper → option zipper := down_coord address_item.app_left
+    meta def down_app_right : zipper → option zipper := down_coord address_item.app_right
+
+    meta def down_body : zipper → option zipper := λ z,
         match down z with
         |down_result.pi _ _ _ b := some b
         |down_result.lam _ _ _ b := some b
         |down_result.elet _ _ _ b := some b
         |_ := none
         end
+    meta def down_var_type : zipper → option zipper := λ z,
+        match down z with
+        |down_result.pi _ _ y b := some y
+        |down_result.lam _ _ y b := some y
+        |down_result.elet _ y _ b := some y
+        |_ := none
+        end
+
+    meta def down_address : address → zipper → option zipper
+    |[] z := some z
+    |(h::t) z := down_coord h z >>= down_address t
+
     meta def unzip : zipper → expr := λ z, option.rec_on (up z) (current z) (unzip)
-    meta def unzip_with_ctxt : zipper → expr × list src := λ z, option.rec_on (up z) (current z, ctxt z) unzip_with_ctxt
-    meta def zip : expr → zipper := λ e, zipper.mk [] [] e
+    --meta def unzip_with_ctxt : zipper → expr × list src := λ z, option.rec_on (up z) (current z, ctxt z) unzip_with_ctxt
+    meta def zip : expr → zipper := λ e, zipper.mk [] e
     meta instance : has_coe expr zipper := ⟨zip⟩
-    meta def zip_with_ctxt : list src → expr → zipper
-    |ctxt current := {path := [], ctxt:= ctxt, current := current}
+    -- meta def zip_with_ctxt : list src → expr → zipper
+    -- |ctxt current := {path := [], ctxt:= ctxt, current := current}
     -- meta def zip_with_metas : telescope → expr → zipper := zip_with_ctxt ∘ src.mvars_of_telescope
-    meta def zip_with_hyps := zip_with_ctxt ∘ src.hyps_of_telescope
+    -- meta def zip_with_hyps := zip_with_ctxt ∘ src.hyps_of_telescope
     meta def set_current : expr → zipper → zipper
-    |e ⟨p,c,_⟩ := ⟨p,c,e⟩
+    |e ⟨p,_⟩ := ⟨p,e⟩
     meta def map : (expr → expr) → zipper → zipper
-    |f ⟨p,ctxt,e⟩ := ⟨p,ctxt,f e⟩
+    |f ⟨p,e⟩ := ⟨p,f e⟩
     meta def mmap {T} [monad T] : (expr → T expr) → zipper → T zipper
-    |f ⟨p,ctxt,e⟩ := zipper.mk p ctxt <$> f e
+    |f ⟨p,e⟩ := zipper.mk p <$> f e
+    meta def address : zipper → address := path.to_address ∘ path
+    meta def ctxt : zipper → list src := path.to_context ∘ path
     /--The number of binders above the cursor. -/
-    meta def binder_depth : zipper → ℕ := list.length ∘ zipper.ctxt
+    meta def binder_depth : zipper → ℕ := list.length ∘ ctxt
     meta def unzip_with : expr → zipper → expr := λ e z, unzip $ z.set_current e
     meta def is_var : zipper → bool := expr.is_var ∘ current
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
@@ -253,14 +312,7 @@ namespace zipper
         ),
         pure (rhs',pf')
     
-    -- meta def apply_rule : rule → zipper → tactic rule := λ r z, do
-    --     r ← r.head_rewrite z.current,
-    --     (rhs', pf') ← apply_congr (r.rhs,r.pf) z,
-    --     --tactic.infer_type pf' >>= trace,
-    --     --trace pf',
-    --     r' ← rule.of_prf r.id pf',
-    --     --trace "hello",
-    --     pure r'
+
 
     meta def apply_conv : conv unit → zipper → conv unit := λ cnv z, do
         let lhs := z.current,
@@ -288,9 +340,9 @@ namespace zipper
         let params := list.reverse params,
         ⟨zippers, _⟩ ← params.mfoldl (λ acc p, do
             let (⟨zippers,z⟩ : (list zipper) × zipper) := acc,
-            z' ← app_left z,
+            z' ← down_app_left z,
             if is_proper p then do
-                zr ← app_right z,
+                zr ← down_app_right z,
                 --t ← is_type zr,
                 --if t then pure (zippers,z') else
                 pure (zr::zippers,z')
@@ -309,11 +361,6 @@ namespace zipper
         |(down_result.pi _ _ _ _) := notimpl
         |(down_result.elet _ _ _ _) := notimpl
         end
-
-    meta def down_app_right : zipper → option zipper := λ z, match down z with
-    |(down_result.app _ x) := some x
-    |_ := none
-    end
 
     /--Traverse all of zipper.current. If `f` fails, then that branch is skipped.-/
     meta def traverse_proper {α} (f : α →  zipper → tactic α) : α → zipper → tactic α
@@ -348,19 +395,7 @@ namespace zipper
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
-    -- meta def rewrite_conv (r : rule) : conv unit := do	
-    --     lhs ← conv.lhs >>= instantiate_mvars,
-    --     sub ← instantiate_mvars r.lhs,
-    --     l ← ez.zipper.find_occurences (zip lhs) r.lhs,
-    --     -- trace_m "rewrite_conv: " $ (lhs,r, l),
-    --     (z::rest) ← pure l,
-    --     r ← apply_rule r z,
-    --     transitivity,
-    --     apply r.pf,
-        
-    --     --trace_state, trace r,
-    --     try $ all_goals $ apply_instance <|> prop_assumption,
-    --     pure ()
+
     
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
@@ -410,34 +445,51 @@ namespace zipper
     meta def distance_to_subterm_down (e : expr) : zipper → nat → tactic nat
     |z d :=
         if z.is_mvar then failure else
-        (tactic.hypothetically' $ unify e z.current *> pure d)
-        <|> do
+        (tactic.hypothetically' $ (do 
+            unify e z.current,  pure d
+        ))
+        <|> (do
+            -- tactic.trace_m "dtsd: " $ z,
             (_,zs) ← down_proper z,
             list.mfirst (λ iz : ℕ × zipper, distance_to_subterm_down iz.2 $ iz.1 + d + 1)
             $ list.with_indices zs
+        )
 
     meta def is_app_right : zipper → bool
-    |⟨(path.app_right _ _)::t,_,_⟩ := tt
+    |⟨(path.app_right _ _)::t,_⟩ := tt
     |_ := ff
 
     meta def right : zipper → option zipper
-    |z := if is_app_right z then up z >>= right else up z >>= app_right
+    |z := if is_app_right z then up z >>= right else up z >>= down_app_right
 
     meta def distance_to_subterm_up (e : expr) : ℕ → zipper → tactic ℕ
     |d z :=
         if is_app_right z then up z >>= distance_to_subterm_up (d+1) else do
-        z ← up z >>= lift app_right,
+        -- tactic.trace_m "dtsu1: " $ z,
+        z ← up z >>= lift down_app_right,
+        -- tactic.trace_m "dtsu2: " $ z,
         distance_to_subterm_down e z (d+1) 
         <|> distance_to_subterm_up (d+1) z
 
-    meta def get_distance (outer : expr) (l : expr) (r : expr) : tactic ℕ :=
-        find_subterm l (zip outer) >>= distance_to_subterm_up r 0
+    meta def get_distance (outer : expr) (l : expr) (r : expr) : tactic ℕ := do
+        outer ← instantiate_mvars outer,
+        first ← find_subterm l outer,
+        -- tactic.trace_m "gd: " $ first, 
+        distance_to_subterm_up r 0 first
 
     meta def get_proper_children (e : expr) : tactic (list expr) := do
         e ← instantiate_mvars e,
         (list.map current <$> prod.snd <$> (down_proper $ zip e)) <|> pure []
     meta def get_smallest_complex_subterms (z : zipper) : tactic (list zipper) := do
         minimal_monotone (λ z, do ⟨_,[]⟩ ← down_proper z | failure, pure z) z
+
+    meta def instantiate_mvars : zipper → tactic zipper
+    |z := do
+        let a := address z,
+        let e := unzip z,
+        e ← tactic.instantiate_mvars e,
+        z ← down_address a e,
+        pure z
 
     -- meta def clone_mvars : zipper → tactic (zipper)
     -- |z := do 

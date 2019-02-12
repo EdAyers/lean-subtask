@@ -119,15 +119,6 @@ namespace rule
 
     meta def lhs_pattern (r : rule) : tactic pattern := telescope.to_pattern r.ctxt r.lhs
 
-    meta def to_mvars (r : rule) : tactic (rule × list expr) := do
-        gs ← get_goals,
-        res ← mk_mvar,
-        set_goals [res],
-        ms ← apply_core r.pf {instances := ff},
-        res ← instantiate_mvars res,
-        r ← rule.of_prf r.id res,
-        set_goals gs,
-        pure (r, prod.snd <$> ms)
     meta def instantiate_mvars (r : rule) : tactic rule := tactic.instantiate_mvars r.pf >>= rule.of_prf r.id
 
     meta def get_local_const_dependencies (r : rule) : tactic (list expr) := do
@@ -140,9 +131,6 @@ namespace rule
     -- [HACK] I am assuming that there are no subtypings and so on which is probably a bad assumption.
         pure $ list.foldl bor ff lcds
 
-    meta def count_metas (r : rule) : tactic nat := do
-        lhs ← tactic.instantiate_mvars r.lhs,
-        pure $ table.size $ expr.fold r.lhs (table.empty) (λ e _ t, if expr.is_mvar e then table.insert e t else t)
 
 
     meta def is_commuter (r : rule) : tactic bool :=

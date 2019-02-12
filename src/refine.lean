@@ -1,15 +1,15 @@
 import .M .zipper
 namespace robot
-open strategy task tactic robot.tactic
-meta def strategy.merge : strategy → strategy → M strategy 
-|(Use r₁) (Use r₂) := do
-    r ← hypothetically' (do 
-        unify r₁.lhs r₂.lhs,
-        unify r₁.rhs r₂.rhs, 
-        rule.instantiate_mvars r₁
-    ),
-    pure $ Use r
-|_ _ := failure
+open strategy task tactic robot.tactic ez
+-- meta def strategy.merge : strategy → strategy → M strategy 
+-- |(Use r₁) (Use r₂) := do
+--     r ← hypothetically' (do 
+--         unify r₁.lhs r₂.lhs,
+--         unify r₁.rhs r₂.rhs, 
+--         rule.instantiate_mvars r₁
+--     ),
+--     pure $ Use r
+-- |_ _ := failure
 
 meta def task.test : expr → task → M bool
 |ce (task.Create e) := do
@@ -49,8 +49,8 @@ meta def task.diom : task → M (list strategy) := λ t, do
     lookahead ← get_lookahead,
     -- trace_m "diom: " $ lookahead,
     list.mchoose (λ r, do 
-        let rhs := rule.rhs r,
-        let pf := rule.pf r,
+        let rhs := zipper.unzip $ rule_app.rhs r,
+        let pf := rule_app.pf r,
         M.hypothetically' (do
                 result ← task.test rhs t,
                 if result then pure () else failure
@@ -65,19 +65,21 @@ meta def try_dioms : task → M refinement | t := do
     if ¬ dioms.empty then pure ([],dioms) else failure
 
 open ez tactic
-meta def get_distance_reducer : expr → expr → M (rule)
+meta def get_distance_reducer : expr → expr → M (rule_app)
 | a b := do
+    a ← instantiate_mvars a, 
     ce ← get_ce,
     current_dist ← zipper.get_distance ce a b,
-    -- trace_m "\ngdr: " $ (ce, current_dist),
+    -- trace_m "\ngdr: " $ (ce, a, b,  current_dist),
     rs ← get_lookahead,
     drs ← list.mchoose (λ r, (do
-        new_dist ← zipper.get_distance (rule.rhs r) a b,
-        -- trace_m "gdr: " $ (r.rhs, new_dist),
+        -- trace_m "gdr: " $ (rule_app.rhs r),
+        new_dist ← zipper.get_distance (rule_app.rhs $ r) a b,
+        -- trace_m "gdr: " $ (rule_app.rhs r, new_dist),
         pure (new_dist,r)
         --pure $ new_dist < current_dist) <|> pure ff
     )) rs,
-    let drs := drs.filter (λ p : ℕ × rule, p.1 < current_dist),
+    let drs := drs.filter (λ p : ℕ × rule_app, p.1 < current_dist),
     drs ← list.minby (int.of_nat ∘ prod.fst) drs,
     pure drs.2
     
@@ -127,12 +129,13 @@ match t with
     ce ← get_ce,
     rt ← get_rule_table,
     submatches ← rt.submatch e,
+    -- trace_m "task.refine: " $ (e,submatches),
     use_comm ← can_use_commutativity e,
     -- trace_m "task.refine: " $ use_comm,
     submatches ← pure submatches, -- if use_comm then pure submatches else submatches.mfilter (λ z, bnot <$> rule.is_commuter z),
     -- [TODO] need a way of ignoring commutativity here. 
     -- trace_m "task.refine: " $ submatches,
-    strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule.lhs_wildcard r) $ submatches,
+    strats ← pure $ list.map strategy.Use $ list.filter (λ r, ¬ rule_app.lhsz_is_meta r) $ submatches,
     pure $ ([],rss ++ strats)
 |(task.CreateAll a) := do
     ce ← get_ce >>= lift instantiate_mvars,
@@ -152,7 +155,7 @@ match t with
     -- find all rules which will remove `x` from the face of the earth?
     submatches ← rt.submatch x,
     notimpl
-|(task.Merge x) := do
+|_ := do
     /- Find rules which will:
         a. perform a factorisation such that `x` is factorised.
         b. perform a straight merge such as `F(x) ∩ F(x) = F(x)` or `x + x = 2 * x`
@@ -170,18 +173,18 @@ meta def strategy.execute : strategy → M unit
 |(strategy.ReduceDistance a b) := do
     repeat (do 
         h ← get_distance_reducer a b,
-        run_conv $ zipper.rewrite_conv h
+        run_conv $ rule_app.rewrite_conv h
     )
-|s@(strategy.Use r)              := run_conv $ zipper.rewrite_conv r
+|s@(strategy.Use r)            := 
+    run_conv $ rule_app.rewrite_conv r
 
 meta def strategy.refine : strategy → M refinement
 |(strategy.ReduceDistance a b) := pure $ ([],[])
 |(strategy.Use r)              := do
     ce ← get_ce,
-    ⟨r,ms⟩ ← rule.to_mvars r,
     subs : list zipper ← zipper.minimal_monotone (λ lz,
         if lz.is_mvar || lz.is_constant then failure else do
-        ⟨r,ms⟩ ← rule.to_mvars r,
+        --⟨r,ms⟩ ← rule.to_mvars r,
         l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
         if l.empty then pure lz else failure
     ) $ zipper.zip $ r.lhs,

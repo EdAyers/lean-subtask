@@ -39,7 +39,7 @@ meta def requires_nonmeta_variable_present_in_rule (r : rule) : M nat := do
      A better refinement would be:  
      -/
      
-meta def score_rule (r : rule) : M int := do
+meta def score_rule (r : rule_app) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 
     ce ← get_ce,
@@ -58,16 +58,16 @@ meta def score_rule (r : rule) : M int := do
         if ¬ expr.is_composite r.lhs then pure ff else
             bnot 
             <$> list.empty 
-            <$> list.mchoose (λ x, 
+            <$> list.mchoose (λ x : rule_app, 
                 state_t.lift 
                 $ tactic.hypothetically' 
                 $ (do 
-                    zipper.find_subterm r.lhs (zipper.zip $ rule.rhs x), 
+                    zipper.find_subterm r.lhs (zipper.zip $ rule_app.rhs x), 
                     pure x)
             ) lookahead
         ,
 
-    is_comm ← rule.is_commuter r,
+    is_comm ← rule_app.is_commuter r,
     pure $ (if is_comm then -5 else 0) + (if is_local then 10 else 0) + (if has_diom then 10 else 0) - meta_count + /- lcsts -/ - symm_diff
 
 meta def score_strategy : strategy → M int

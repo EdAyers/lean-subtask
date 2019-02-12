@@ -33,10 +33,10 @@ namespace submatch
     --     rule.of_prf $ expr.mk_app r.pf ms.reverse
 
     /-- [HACK] run_app does the same thing as `run` except that sometimes the unifier doesn't try to unify the function and argument separately. -/
-    meta def run_app : expr → submatch → tactic rule
+    meta def run_app : expr → submatch → tactic rule_app
     | e ⟨r,z⟩ := do
         (expr.app f a) ← pure e,
-        (mrule, ms) ← rule.to_mvars r,
+        (mrule, ms) ← rule_app.of_rule r,
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         current@(expr.app f₂ a₂) ← pure $ expr.instantiate_vars z.current $ ms.reverse,
         -- current ← instantiate_mvars current,
@@ -51,16 +51,16 @@ namespace submatch
         --trace_state,
 
     /--`run e s` attempts to unify `e` with the subterm of `s` and then returns a rule depending on fresh metavariables.-/
-    meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do
+    meta def run : expr → submatch → tactic rule_app | e ⟨r,z⟩ := do
         --e ← instantiate_mvars e,
-        (mrule, ms) ← rule.to_mvars r,
+        (ra, ms) ← rule_app.of_rule r,
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         let current := expr.instantiate_vars z.current $ ms.reverse,
         current ← instantiate_mvars current,
         --trace_m "submatch.run: " $ current,
         unify current e, -- [TODO] for some reason this can't unify `A ?m_1` and `?m_2 ?m_3`?
         --trace_state,
-        mrule.instantiate_mvars
+        ra.instantiate_mvars
         
     meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
 end submatch
@@ -111,7 +111,12 @@ namespace rule_table
         let t := wilds ∪ keyed,
         -- kpp ← pp k, tpp ← pp t,
         -- trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
-        t.mfold (λ acc r, (do r ← head_rewrite r lhs, pure $ r :: acc) <|> pure acc) []
+        t.mfold (λ acc r, (do 
+            (ra,_) ← rule_app.of_rule r,
+            ra ← rule_app.head_rewrite ra lhs, 
+            pure $ ra :: acc
+            ) <|> pure acc
+        ) []
 
     -- meta def head_rewrites_rhs (rhs : expr) (rt : rule_table) (cfg : rewrites_config := {}) : (tactic $ list rule) := do
     --     head_rewrites rhs rt >>= list.mmap rule.flip
@@ -120,7 +125,7 @@ namespace rule_table
     : zipper → list rule_app → tactic (list rule_app)
     |z acc := do
         hrs ← head_rewrites z.current rt cfg,
-        -- hrs ← list.mchoose (λ rw, head_rewrite rw z) hrs,
+        hrs ← list.mchoose (λ rw, rule_app.head_rewrite rw z) hrs,
         acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,
         acc ← children.mfoldl (λ acc z, rewrites_aux z acc) acc,
@@ -135,7 +140,7 @@ namespace rule_table
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
     /--`submatch e rt` finds rules such that the rhs of the rule contains `e`-/
-    meta def submatch : expr → rule_table → tactic (list rule) | e rt :=
+    meta def submatch : expr → rule_table → tactic (list rule_app) | e rt :=
         let key := get_key e in
         let submatches := rt.submatch_table.get key in
         if (key = `rule_table.app) 

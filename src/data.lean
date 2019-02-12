@@ -47,7 +47,7 @@ open task
 
 @[derive decidable_eq]
 meta inductive strategy : Type
-|Use : rule → strategy
+|Use : rule_app → strategy
 |ReduceDistance : expr → expr → strategy
 open strategy
 namespace strategy
@@ -66,7 +66,7 @@ namespace strategy
         | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
     end⟩
     meta def is_def_eq : strategy → strategy → tactic bool
-    |(Use r₁) (Use r₂) := rule.is_def_eq r₁ r₂
+    |(Use r₁) (Use r₂) := rule_app.is_def_eq r₁ r₂
     |(ReduceDistance a b) (ReduceDistance c d) :=
         tactic.is_success $ (do tactic.is_def_eq a c, tactic.is_def_eq b d)
     |_ _ := pure ff
