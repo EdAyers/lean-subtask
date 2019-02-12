@@ -57,10 +57,12 @@ namespace submatch
         if ¬z.ctxt.empty then fail "not implemented when z contains bound variables" else do
         let current := expr.instantiate_vars z.current $ ms.reverse,
         current ← instantiate_mvars current,
-        --trace_m "submatch.run: " $ current,
-        unify current e, -- [TODO] for some reason this can't unify `A ?m_1` and `?m_2 ?m_3`?
-        --trace_state,
-        ra.instantiate_mvars
+        -- tactic.trace_m "submatch.run: " $ current,
+        tactic.hypothetically' (do 
+            unify current e, -- [HACK] for some reason this can't unify `A ?m_1` and `?m_2 ?m_3`? Current fix is `run_app`.
+            --trace_state,
+            ra.instantiate_mvars
+        )
         
     meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
 end submatch

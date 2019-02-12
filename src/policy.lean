@@ -68,7 +68,13 @@ meta def score_rule (r : rule_app) : M int := do
         ,
 
     is_comm ← rule_app.is_commuter r,
-    pure $ (if is_comm then -5 else 0) + (if is_local then 10 else 0) + (if has_diom then 10 else 0) - meta_count + /- lcsts -/ - symm_diff
+    pure 
+        $ (if is_comm then -5 else 0) 
+        + (if is_local then 10 else 0) 
+        + (if has_diom then 10 else 0) 
+        - meta_count 
+        + /- lcsts -/ 
+        - symm_diff
 
 meta def score_strategy : strategy → M int
 |(strategy.ReduceDistance a b) := pure 0
