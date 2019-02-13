@@ -50,7 +50,7 @@ def up : zipper α → option (zipper α)
 |⟨path.top _, c⟩ := none
 |⟨path.down a n l p,c⟩ := some $ zipper.mk p $ tree.branch a $ list.update_nth l n c
 
-/--Go up and remove the current branch from the resulting tree. -/
+/-- Go up and remove the current branch from the resulting tree. -/
 def up_drop : zipper α → option (zipper α) 
 |⟨path.top _, c⟩ := none
 |⟨path.down a n l p, c⟩ := 
@@ -87,10 +87,12 @@ meta def fold_up {α β} (f : β → zipper α → β) : β → zipper α → β
 |b z := let b := f b z in option.rec_on (up z) b $ fold_up b
 
 /--Get all of the items in the tree that are _strictly above_ the current position. -/
-meta def above : zipper α → list α := path.items ∘ zipper.p
-meta def depth : zipper α → ℕ := list.length ∘ above
+meta def strict_above : zipper α → list α := path.items ∘ zipper.p
+/--Get all of the items in the tree that are _above or at_ the current position. -/
+meta def lax_above : zipper α → list α :=λ z, z.item :: (path.items $ zipper.p $ z)
+meta def depth : zipper α → ℕ := list.length ∘ strict_above
 
-meta def any_above {α} (f : α → bool) : zipper α → bool := λ z, z.above.any f
+meta def any_strict_above {α} (f : α → bool) : zipper α → bool := λ z, z.strict_above.any f
 
 meta def pp_item_with_indent [has_to_tactic_format α] : zipper α → tactic format := λ z, do
   pa ← tactic.pp z.item,

@@ -77,7 +77,10 @@ meta def score_rule (r : rule_app) : M int := do
         - symm_diff
 
 meta def score_strategy : strategy → M int
-|(strategy.ReduceDistance a b) := pure 0
+|(strategy.ReduceDistance a b) := do
+     ce ← get_ce,
+     d ← get_distance ce a b,
+     pure $ max (10 - d) 0
 |(strategy.Use r) := score_rule r
 
 meta def score_policy : policy

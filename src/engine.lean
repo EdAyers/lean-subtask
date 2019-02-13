@@ -3,15 +3,15 @@ namespace robot
 open tree.zipper tactic robot.tactic
 
 meta def has_task : Z → task → tactic bool
-|z t := (bnot ∘ list.empty) <$> (z.above.mfilter $ tree_entry.is_eq (tree_entry.task t []))
+|z t := (bnot ∘ list.empty) <$> (z.strict_above.mfilter $ tree_entry.is_eq (tree_entry.task t []))
 meta def has_strat : Z → strategy → tactic bool
 |z (strategy.Use r) := (bnot ∘ list.empty) <$> 
-    (z.above.mfilter $ ( λ x, match x with
+    (z.strict_above.mfilter $ ( λ x, match x with
         |(tree_entry.strat (strategy.Use r₂) _) := pure $ r = r₂ ∨ (r.lhs = r₂.rhs ∧ r.rhs = r₂.lhs) 
         |_ := pure ff
         end
     ))
-|z t := (bnot ∘ list.empty) <$> (z.above.mfilter $ tree_entry.is_eq (tree_entry.strat t []))
+|z t := (bnot ∘ list.empty) <$> (z.strict_above.mfilter $ tree_entry.is_eq (tree_entry.strat t []))
 
 meta def explore_tasks : list Z → list action → M (list action)
 |[] acc := pure acc
@@ -48,23 +48,10 @@ meta def explore_strategy : action → M (list action)
   explore_tasks (tree.zipper.children $ tree.zipper.grow children $ z) []
 
 meta def push_achieved : task → Z → Z := map_item ∘ tree_entry.push_achieved
-/-- Fold over all of the achieved tasks strictly above the current zipper. -/
+/-- Fold over all of the achieved tasks above the current zipper. -/
 meta def mfold_achieved {T} [monad T] {α} (f : α → task → T α) : α → Z → T α
-|a z := z.above.mfoldl (λ a t, list.mfoldl f a $ tree_entry.achieved $ t) a
+|a z := z.strict_above.mfoldl (λ a t, list.mfoldl f a $ tree_entry.achieved $ t) a
 
-meta def execute : action → M unit
-|⟨s,z⟩ := do
-  state ← get,
-  ce ← get_ce,
-  strategy.execute s,
-  ce' ← get_ce,
-  path ← get_path,
-  when (ce' ∈ path.tail) (fail "expression looped back"),
-  mfold_achieved (λ _ ach, do
-    r ← ach.test ce',
-    when (¬r) (fail "strategy caused a previously achieved task to fail")
-  ) () z,
-  targ ← target, trace targ
 
 meta def trace_path : M unit := do
     ce ← get_ce,
@@ -85,14 +72,35 @@ meta def ascend : Z → M (list action) := λ z,
     if is_achieved then do
       match up_drop z with
       |none := do trace "done!", trace_path, pure []
-      |some z := do ascend z
+      |some z := do 
+        z ← pure $ push_achieved t z,
+        trace_m "ascend: " $ (t, z.item),
+        ascend z
       end
     else
       explore z
   |(tree_entry.strat s _) :=
-    (do execute (s,z), z ← up_drop z | pure [], ascend z)
-    <|> 
-    (do explore_strategy ⟨s,z⟩)
+    (do 
+        state ← get,
+        ce ← get_ce,
+        strategy.execute s, -- if this fails, explore the strategy. 
+        ce' ← get_ce,
+        path ← get_path,
+        when (ce' ∈ path.tail) (fail "expression looped back"),
+        mfold_achieved (λ _ ach, do
+            r ← ach.test ce',
+            tactic.trace_m "test:" $ (r, ach, ce', s),
+            when (¬r) (fail "strategy caused a previously achieved task to fail")
+        ) () z,
+        
+        targ ← target, 
+        trace targ,
+        z ← up_drop z | pure [], 
+        ascend z
+    ) <|> 
+    (do 
+        explore_strategy ⟨s,z⟩
+    )
   end
 
 meta def step : action → M (list action)

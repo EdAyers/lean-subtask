@@ -330,7 +330,8 @@ namespace zipper
         refine ```(@eq.rec %%T %%lhs (λ X, %%lhs' = z.unzip_with $ expr.var 0) rfl %%rhs _),
         cnv
 
-    private meta def is_proper (p : param_info) : bool := ¬(param_info.is_implicit p || param_info.is_inst_implicit  p || param_info.is_prop p)
+    private meta def is_proper (p : param_info) : bool := 
+        ¬(param_info.is_implicit p || param_info.is_inst_implicit  p || param_info.is_prop p)
 
     meta def is_type (z : zipper) : tactic bool := expr.is_sort <$> tactic.infer_type z.current
 
