@@ -164,9 +164,12 @@ match t with
     pure $ (scs, [])
 |(task.Annihilate x) := do
     ce ← get_ce, rt ← get_rule_table,
+    rss ← (list.singleton <$> get_distance_reducer x x) <|> pure [],
     -- find all rules which will remove `x` from the face of the earth?
-    submatches ← rt.submatch x,
-    notimpl
+    trace_m "refine annihilate: " $ rss,
+    if ¬ rss.empty then
+        pure $ ([],[strategy.ReduceDistance x x])
+    else pure ([],[])
 |_ := do -- MERGE
     /- Find rules which will:
         a. perform a factorisation such that `x` is factorised.
