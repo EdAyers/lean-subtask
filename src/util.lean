@@ -132,8 +132,10 @@ meta def expr.is_sort : expr → bool
 |(expr.sort _) := tt
 |_ := ff
 
-meta def expr.is_term (e : expr) : tactic bool 
-:= (bnot ∘ expr.is_sort) <$> infer_type e
+meta def expr.is_term (e : expr) : tactic bool := do
+    T ← infer_type e,
+    iscl ← tactic.is_class T,
+    pure $ (¬ expr.is_sort T) && ¬ iscl
 
 meta def list_local_const_terms (e : expr) : tactic (list expr) 
 := mfilter expr.is_term $ list_local_consts e

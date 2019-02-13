@@ -140,7 +140,7 @@ match t with
 |(task.CreateAll a) := do
     ce ← get_ce >>= lift instantiate_mvars,
     -- trace_m "refine CreateAll: " $ ce,
-    scs ← zipper.lowest_uncommon_subterms ce $ zipper.zip a,
+    scs ← zipper.lowest_uncommon_subterms ce a,
     -- trace_m "refine CreateAll: " $ scs,
     if scs.length = 0 then pure $ ([],[]) else do
     -- if list.any scs (zipper.is_top)  then do 
@@ -149,13 +149,23 @@ match t with
     --     pure $ ([], strategy.Use <$> hrws)
     -- else do
     let scs := task.Create <$> zipper.current <$> scs,
+
+    -- find the smallest absent subterms on the LHS bit not RHS
+    rscs ← zipper.lowest_uncommon_subterms a ce,
+
+
+    lhs_lcs ← list_local_const_terms ce,
+    rhs_lcs ← list_local_const_terms a,
+    to_annihilate ← pure $ list.map task.Annihilate $ lhs_lcs.filter (∉ rhs_lcs),
+    let scs := scs ++ to_annihilate,
+
     pure $ (scs, [])
 |(task.Annihilate x) := do
     ce ← get_ce, rt ← get_rule_table,
     -- find all rules which will remove `x` from the face of the earth?
     submatches ← rt.submatch x,
     notimpl
-|_ := do
+|_ := do -- MERGE
     /- Find rules which will:
         a. perform a factorisation such that `x` is factorised.
         b. perform a straight merge such as `F(x) ∩ F(x) = F(x)` or `x + x = 2 * x`
