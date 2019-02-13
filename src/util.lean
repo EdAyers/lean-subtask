@@ -23,6 +23,9 @@ prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.ca
 def list.minby {α} (f : α → int) (l : list α) : option α :=
     list.maxby (has_neg.neg ∘ f) l
 def list.singleton {α} : α → list α := λ a, [a]
+def list.first {α} (f : α → bool) : list α → option α
+|[] := none
+|(h::t) := if f h then some h else list.first t 
 def list.mfirst {T} [alternative T] {α β} (f : α → T β) : list α → T β
 |[] := failure |(h::t) := f h <|> list.mfirst t
 def list.msome {T} [monad T] {α} (f : α → T bool) : list α → T bool

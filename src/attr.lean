@@ -1,4 +1,0 @@
-
-namespace robot
-
-end robot

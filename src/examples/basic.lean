@@ -26,7 +26,9 @@ by equate
 example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
 by equate 
 example : a * b + b * c = (a + c) * b := 
-by equate 
+by equate
+example : (a * b) - c + (b * a) = - c + (a * b + a * b) := 
+by equate  
 example : (a + c) * b = a * b + b * c := 
 by equate 
 example : (x + y) + (z + w) = (x + z) + (y + w) := 

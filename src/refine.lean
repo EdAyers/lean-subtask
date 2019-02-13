@@ -12,21 +12,22 @@ open strategy task tactic robot.tactic ez
 -- |_ _ := failure
 
 meta def task.test : expr → task → M bool
-|ce (task.Create e) := do
+|ce (task.Create n e) := do
     e ← instantiate_mvars e,
     pp_ce ← pp ce, pp_e ← pp e,
     --trace_m "task.test: " $ (to_fmt "testing that " ++ pp_ce ++ " satisfies Create " ++ pp_e),
-    matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e ,
+    matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e,
+    pure $ matches.length ≥ n
     --trace_m "task.test: " $ matches,
-    pure $ bnot matches.empty
+    -- pure $ bnot matches.empty
 |ce t@(task.CreateAll e) :=
     -- trace_m "task.test: " $ t,
     (hypothetically' (unify e ce *> pure tt)) <|> pure ff
 |ce t@(task.Annihilate x) :=
     (ez.zipper.find_subterm x ce *> pure ff) <|> pure tt
-|ce t@(task.Create2 x) := do
-    subs ← ez.zipper.find_subterms x ce,
-    pure $ subs.length ≥ 2
+-- |ce t@(task.Create2 x) := do
+--     subs ← ez.zipper.find_subterms x ce,
+--     pure $ subs.length ≥ 2
 |ce t := notimpl
 meta def hoist : task → strategy → M strategy
 |t s@(Use r₁) := do
@@ -123,7 +124,7 @@ meta def can_use_commutativity : expr → M bool := λ e, (do
 meta def task.refine (t : task) : M refinement :=
 try_dioms t <|>
 match t with
-|(task.Create e) := do
+|(task.Create n e) := do
     rss ← (list.singleton <$> can_use_ReduceDistance e) <|> pure [],
     -- trace_m "task.refine: " $ rss,
     ce ← get_ce,
@@ -140,7 +141,8 @@ match t with
 |(task.CreateAll a) := do
     ce ← get_ce >>= lift instantiate_mvars,
     -- trace_m "refine CreateAll: " $ ce,
-    scs ← zipper.lowest_uncommon_subterms ce a,
+    --scs ← zipper.lowest_uncommon_subterms ce a,
+    scs ← zipper.smallest_absent_subterms ce a,
     -- trace_m "refine CreateAll: " $ scs,
     if scs.length = 0 then pure $ ([],[]) else do
     -- if list.any scs (zipper.is_top)  then do 
@@ -148,7 +150,7 @@ match t with
     --     hrws ← rule_table.head_rewrites_rhs a rt,
     --     pure $ ([], strategy.Use <$> hrws)
     -- else do
-    let scs := task.Create <$> zipper.current <$> scs,
+    let scs := (λ p : ℕ × zipper, task.Create p.1 p.2.current) <$> scs,
 
     -- find the smallest absent subterms on the LHS bit not RHS
     rscs ← zipper.lowest_uncommon_subterms a ce,
@@ -192,13 +194,15 @@ meta def strategy.refine : strategy → M refinement
 |(strategy.ReduceDistance a b) := pure $ ([],[])
 |(strategy.Use r)              := do
     ce ← get_ce,
-    subs : list zipper ← zipper.minimal_monotone (λ lz,
-        if lz.is_mvar || lz.is_constant then failure else do
-        --⟨r,ms⟩ ← rule.to_mvars r,
-        l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
-        if l.empty then pure lz else failure
-    ) $ zipper.zip $ r.lhs,
-    subs ← subs.mmap (λ z, task.Create <$> instantiate_mvars z.current),
+    scs ← zipper.smallest_absent_subterms ce r.lhs,
+
+    -- subs : list zipper ← zipper.minimal_monotone (λ lz,
+    --     if lz.is_mvar || lz.is_constant then failure else do
+    --     --⟨r,ms⟩ ← rule.to_mvars r,
+    --     l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
+    --     if l.empty then pure lz else failure
+    -- ) $ zipper.zip $ r.lhs,
+    subs ← scs.mmap (λ z, task.Create z.1 <$> instantiate_mvars z.2.current),
     pure ⟨subs, []⟩
 
 

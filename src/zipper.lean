@@ -5,17 +5,23 @@ open robot
 
 @[derive decidable_eq]
 meta inductive address_item 
-|app_left
-|app_right
-|lam_var_type
-|lam_body
-|pi_var_type
-|pi_body
-|elet_type
-|elet_assignment
-|elet_body
+|app_left     |app_right
+|lam_var_type |lam_body
+|pi_var_type  |pi_body
+|elet_type    |elet_assignment |elet_body
+meta def address_item.code: address_item → ℕ |address_item.app_left          := 0 |address_item.app_right         := 1 |address_item.lam_var_type      := 2 |address_item.lam_body          := 3 |address_item.pi_var_type       := 4 |address_item.pi_body           := 5 |address_item.elet_type         := 6 |address_item.elet_assignment   := 7 |address_item.elet_body         := 8
+meta instance address_item.has_lt : has_lt address_item := ⟨λ x y, x.code < y.code⟩
+meta instance address_item.dec_lt : decidable_rel ((<) : address_item → address_item → Prop) := by apply_instance
 meta def address := list address_item
+meta instance address.has_lt : has_lt address := show has_lt (list address_item), by apply_instance
+meta instance address.dec_lt : decidable_rel ((<) : address → address → Prop) := by apply_instance
 meta instance address.has_append : has_append address := ⟨list.append⟩
+/-- `is_below x y` is true when ∃ z, y ++ z = x -/
+meta def address.is_below : address → address → bool
+|_ [] := tt -- everything is below root.
+|[] _ := ff -- root is below nothing but itself.
+|(h₁ :: t₁) (h₂ :: t₂) := h₁ = h₂ ∧ address.is_below t₁ t₂
+infixr  ` ≺ `:50 := address.is_below
 @[derive decidable_eq]
 meta inductive path
 |app_left        (left : unit) (right : expr) : path
@@ -395,8 +401,32 @@ namespace zipper
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
-
+    meta def smallest_absent_subterms_aux (l : expr) : list ez.address  → zipper → tactic (list ez.address × list (ℕ × zipper))
+    |used z := do
+        if z.no_locals then pure (used, []) else do
+        occs ← find_occurences l z.current,
+        o ← pure $ list.first (λ o, bnot $ list.any used $ λ x, zipper.address o ≺ x) occs,
+        match o with
+        |none := do -- z.current is not present, descend.
+            (_,children) ← down_proper z,
+            (used,zs) ← list.mfoldl (λ p child, do 
+                (used,zs') ← smallest_absent_subterms_aux (prod.fst p) child, 
+                pure (used,zs' ++ p.2)
+            ) (used,[]) children,
+            if zs.empty then pure $ (used,[(occs.length + 1,z)]) else pure $ (used,zs)
+        |some o := 
+            -- z.current is present on the lhs
+            -- so now we need to add `o` to the used list so that later matches can't use it.
+            pure $ (used.insert o.address,[])
+        end
     
+    /-- find subterms of RHS that do not appear on LHS. It will also count when occurrences have been used.
+        So for example, ``smallest_absent_subterms `(a * b + b * a) `(a * b + a * b)`` will return `[(2,a * b)] because
+        `a * b` occurs once in the LHS but twice in the RHS. 
+    -/
+    meta def smallest_absent_subterms (lhs : expr) (rhs : zipper) :=
+        prod.snd <$> smallest_absent_subterms_aux lhs [] rhs
+
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
         minimal_monotone (λ z, 
