@@ -5,12 +5,12 @@ namespace robot
 meta inductive task : Type
 |CreateAll : expr → task
 |Create : ℕ → expr → task
-/-Make sure that the given expression occurs twice. [TODO] upgrade to `n` eventually. -/
---|Create2 : expr → task
+/- Use a term annihilation move. For example `X * X⁻¹ = e` annihilates anything in X. -/
+|Annihilate : expr → task
 /- passes when we remove the given term from the CE. 
 Generally this is only used when a variable appears in the CE but not 
 in the target and there are no rules explicitly removing the variable. -/
-|Annihilate : expr → task
+|Destroy : expr → task
 |Merge : expr → task
 namespace task
     protected meta def code : task → ℕ
@@ -18,7 +18,7 @@ namespace task
     |(CreateAll _) := 1
     |(Annihilate _) := 2
     |(Merge _) := 3
-    -- |(Create2 _) := 4
+    |(Destroy _) := 4
     protected meta def lt : task → task → bool
     |(Create n₁ e₁) (Create n₂ e₂) := (n₁,e₁) < (n₂,e₂)
     |(CreateAll e₁) (CreateAll e₂) := e₁ < e₂
@@ -34,6 +34,7 @@ namespace task
         pure (λ ppn ppx, "Create(×" ++ ppn ++ ") " ++ ppx) <*> tactic.pp n <*> tactic.pp x
     |(CreateAll x) := pure (λ x, "CreateAll " ++ x) <*> tactic.pp x
     |(Annihilate x) := pure ((++) "Annihilate ") <*> tactic.pp x
+    |(Destroy x) := pure ((++) "Destroy ") <*> tactic.pp x
     |(Merge x) := pure ((++) "Merge ") <*> tactic.pp x
     end⟩
     meta def is_def_eq : task → task → tactic bool

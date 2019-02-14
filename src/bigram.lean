@@ -56,7 +56,7 @@ open ez ez.zipper
 private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic (mtable bigram)
 |t acc z := do
     (b,children) ← down_proper z,
-    match expr.const_name b with
+    match expr.const_name $ zipper.current $ b with
     |(some n) :=
         let acc := acc.insert ⟨t,n⟩ in
         children.mfoldl (get_bigrams_aux n) acc
@@ -65,15 +65,12 @@ private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic 
 
 meta def get_bigrams : expr → tactic (mtable bigram) := λ e, do
     (t,children) ← down_proper $ zip $ e,
-    match expr.const_name t with
+    match expr.const_name $ zipper.current $ t with
     |(some t) := do 
         bgs ← children.mfoldl (get_bigrams_aux t) ∅,
         pure $ if bgs.is_empty then {bigram.mk t name.anonymous} else bgs
     |none := pure ∅
     end
-
-
-
 
 private meta def rare_test : mtable bigram → mtable bigram → bigram → bool
 |occs bs b := (occs(b) ≤ generality) ∨ bs.all (λ b' _, occs(b) ≤ tolerance * occs(b'))

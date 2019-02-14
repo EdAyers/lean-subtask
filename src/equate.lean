@@ -184,16 +184,16 @@ namespace vector_theory
 
     open tactic
     open ez.zipper
-    run_cmd do
-        to_expr ```(Π (A : V → V) (u x y : V),_) >>= assert `h,
-        swap, triv,
-        [A,u,x,y] ← intros,
-        lhs ← to_expr ```(⟪%%A†(%%x + %%y),%%u⟫),
-        rhs ← to_expr ```(⟪%%A† %%x + %%A† %%y, %%u⟫),
-        zs ← lowest_uncommon_subterms lhs (zip rhs),
-        test.equal zs.length 2,
-        --   trace_state,
-        skip
+    -- run_cmd do
+    --     to_expr ```(Π (A : V → V) (u x y : V),_) >>= assert `h,
+    --     swap, triv,
+    --     [A,u,x,y] ← intros,
+    --     lhs ← to_expr ```(⟪%%A†(%%x + %%y),%%u⟫),
+    --     rhs ← to_expr ```(⟪%%A† %%x + %%A† %%y, %%u⟫),
+    --     zs ← lowest_uncommon_subterms lhs (zip rhs),
+    --     test.equal zs.length 2,
+    --     --   trace_state,
+    --     skip
 
 
 end vector_theory

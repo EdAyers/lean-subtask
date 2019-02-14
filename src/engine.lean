@@ -74,7 +74,7 @@ meta def ascend : Z → M (list action) := λ z,
       |none := do trace "done!", trace_path, pure []
       |some z := do 
         z ← pure $ push_achieved t z,
-        trace_m "ascend: " $ (t, z.item),
+        -- trace_m "ascend: " $ (t, z.item),
         ascend z
       end
     else
@@ -89,12 +89,12 @@ meta def ascend : Z → M (list action) := λ z,
         when (ce' ∈ path.tail) (fail "expression looped back"),
         mfold_achieved (λ _ ach, do
             r ← ach.test ce',
-            tactic.trace_m "test:" $ (r, ach, ce', s),
+            -- tactic.trace_m "test:" $ (r, ach, ce', s),
             when (¬r) (fail "strategy caused a previously achieved task to fail")
         ) () z,
         
         targ ← target, 
-        trace targ,
+        trace targ, -- show the updated state.
         z ← up_drop z | pure [], 
         ascend z
     ) <|> 

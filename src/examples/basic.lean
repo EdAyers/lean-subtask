@@ -119,10 +119,10 @@ section
     by equate
     example : X \ ( B ∪ C ) = ( X \ B ) \ C := 
     by equate
-    example : (A ∪ B) \ A = B 
-    := by equate
     @[equate] def A6l : (B ∩ C) ∪ A = (B ∪ A) ∩ (C ∪ A) := by equate
     @[equate] def A7l : (B ∪ C) ∩ A = (B ∩ A) ∪ (C ∩ A) := by equate
+    example : (A ∪ B) \ A = B 
+    := by equate
 
     example : (A ∪ B) \ C = A \ C ∪ B \ C
     := by equate

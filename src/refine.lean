@@ -28,6 +28,8 @@ meta def task.test : expr → task → M bool
 -- |ce t@(task.Create2 x) := do
 --     subs ← ez.zipper.find_subterms x ce,
 --     pure $ subs.length ≥ 2
+|ce t@(task.Destroy e) :=
+    (hypothetically' (unify e ce *> pure ff)) <|> pure tt
 |ce t := notimpl
 meta def hoist : task → strategy → M strategy
 |t s@(Use r₁) := do
@@ -144,7 +146,7 @@ match t with
     --scs ← zipper.lowest_uncommon_subterms ce a,
     scs ← zipper.smallest_absent_subterms ce a,
     -- trace_m "refine CreateAll: " $ scs,
-    if scs.length = 0 then pure $ ([],[]) else do
+    --if scs.length = 0 then pure $ ([],[]) else do
     -- if list.any scs (zipper.is_top)  then do 
     --     rt ← get_rule_table,
     --     hrws ← rule_table.head_rewrites_rhs a rt,
@@ -153,23 +155,29 @@ match t with
     let scs := (λ p : ℕ × zipper, task.Create p.1 p.2.current) <$> scs,
 
     -- find the smallest absent subterms on the LHS bit not RHS
-    rscs ← zipper.lowest_uncommon_subterms a ce,
+    rscs ← zipper.smallest_absent_composite_subterms a ce,
 
+    to_destroy ← pure 
+        $ list.map (task.Destroy) 
+        $ list.map (zipper.current ∘ prod.snd)
+        $ rscs,
 
     lhs_lcs ← list_local_const_terms ce,
+    -- trace_m "lhs_lcs: " $ lhs_lcs,
     rhs_lcs ← list_local_const_terms a,
     to_annihilate ← pure $ list.map task.Annihilate $ lhs_lcs.filter (∉ rhs_lcs),
-    let scs := scs ++ to_annihilate,
-
+    let scs := scs ++ to_annihilate ++ to_destroy,
     pure $ (scs, [])
 |(task.Annihilate x) := do
     ce ← get_ce, rt ← get_rule_table,
     rss ← (list.singleton <$> get_distance_reducer x x) <|> pure [],
     -- find all rules which will remove `x` from the face of the earth?
-    trace_m "refine annihilate: " $ rss,
+    -- trace_m "refine annihilate: " $ rss,
     if ¬ rss.empty then
         pure $ ([],[strategy.ReduceDistance x x])
     else pure ([],[])
+|(task.Destroy x) := do
+    pure ([],[])
 |_ := do -- MERGE
     /- Find rules which will:
         a. perform a factorisation such that `x` is factorised.
