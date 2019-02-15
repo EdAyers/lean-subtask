@@ -203,7 +203,8 @@ namespace zipper
     meta def is_var : zipper → bool := expr.is_var ∘ current
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
     /--True when the current expression does not contain local constants -/
-    meta def no_locals : zipper → bool := list.empty ∘ list_local_consts ∘ current 
+    meta def no_local_consts : zipper → bool := list.empty ∘ list_local_consts ∘ current 
+    meta def no_local_const_terms : zipper → tactic bool := λ z, list.empty <$> (list_local_const_terms $ current $ z)
     meta def is_local_constant : zipper → bool := expr.is_local_constant ∘ current
     meta def is_mvar : zipper → bool := expr.is_mvar ∘ current
     meta def is_terminal : zipper → bool := λ z, z.down = down_result.terminal
@@ -346,9 +347,10 @@ namespace zipper
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
-    meta def smallest_absent_subterms_aux (l : expr) (filter : zipper → bool := combinator.K tt) : list ez.address  → zipper → tactic (list ez.address × list (ℕ × zipper))
+    meta def smallest_absent_subterms_aux (l : expr) (filter : zipper → tactic bool := combinator.K $ pure tt) : list ez.address  → zipper → tactic (list ez.address × list (ℕ × zipper))
     |used z := do
-        if ¬ filter z then pure (used, []) else do
+        filt ← filter z, 
+        if ¬ filt then pure (used, []) else do
         occs ← find_occurences l z.current,
         o ← pure $ list.first (λ o, bnot $ list.any used $ λ x, zipper.address o ≺ x) occs,
         match o with
@@ -370,12 +372,12 @@ namespace zipper
         `a * b` occurs once in the LHS but twice in the RHS. 
     -/
     meta def smallest_absent_subterms (lhs : expr) (rhs : zipper) :=
-        prod.snd <$> smallest_absent_subterms_aux lhs (bnot ∘ no_locals) [] rhs
+        prod.snd <$> smallest_absent_subterms_aux lhs (λ z, bnot <$> no_local_const_terms z) [] rhs
 
     meta def smallest_absent_composite_subterms (lhs : expr) (rhs : zipper) :=
         prod.snd 
             <$> smallest_absent_subterms_aux lhs 
-                (λ s, expr.is_composite s.current) 
+                (λ s, pure $ expr.is_composite s.current) 
                 [] rhs
 
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
