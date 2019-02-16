@@ -135,12 +135,9 @@ namespace rule
 
     meta def is_commuter (r : rule) : tactic bool :=
     match r.lhs, r.rhs with
-    | (expr.app (expr.app f1 (n1)) (m1))
-    , (expr.app (expr.app f2 (n2)) (m2)) := (do
-        tactic.is_def_eq f1 f2,
-        tactic.is_def_eq n1 m2,
-        tactic.is_def_eq n2 m1,
-        pure tt) <|> pure ff
+    | (expr.app (expr.app f1 (expr.var n1)) (expr.var m1))
+    , (expr.app (expr.app f2 (expr.var n2)) (expr.var m2)) :=
+        pure $ f1 = f2 ∧ n1 = m2 ∧ n2 = m1
     |_, _ := pure ff 
     end
 

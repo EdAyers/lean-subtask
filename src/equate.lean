@@ -27,51 +27,49 @@ meta def equate (names : list name := []) := do
 
 /- DEFAULT RULES: -/
 
+attribute [equate] mul_assoc
+attribute [equate] mul_comm
+attribute [equate] mul_left_inv
+attribute [equate] mul_right_inv
+attribute [equate] one_mul
+attribute [equate] mul_one
+attribute [equate] inv_inv
+attribute [equate] mul_inv
+
+attribute [equate] add_assoc
+attribute [equate] add_left_neg
+attribute [equate] add_right_neg
+attribute [equate] zero_add
+attribute [equate] add_zero
+attribute [equate] add_comm
+attribute [equate] neg_add
+attribute [equate] neg_neg
+
+attribute [equate] sub_self
+attribute [equate] sub_eq_add_neg
+attribute [equate] zero_sub
+-- attribute [equate] neg_sub -- [TODO] one of the exercises is to show this, so there should be a way of telling `equate` to omit rules.
+attribute [equate] sub_zero
+attribute [equate] sub_neg_eq_add
+-- attribute [equate] add_sub_assoc
+
+attribute [equate] left_distrib
+attribute [equate] right_distrib
+attribute [equate] mul_zero
+attribute [equate] zero_mul
+attribute [equate] neg_mul_eq_neg_mul
+attribute [equate] neg_mul_eq_mul_neg
+attribute [equate] neg_mul_neg
+attribute [equate] neg_mul_comm
+attribute [equate] mul_sub_left_distrib
+attribute [equate] mul_sub_right_distrib
+
 @[equate] lemma comp_def {α β γ : Type*} {f : α → β} {g : β → γ} {x : α} : (g ∘ f) x = g (f x) := rfl
 
-namespace group_theory
-    universes u
-    attribute [equate] semigroup.mul_assoc
-    attribute [equate] group.mul_left_inv
-    attribute [equate] mul_right_inv
-    attribute [equate] monoid.one_mul
-    attribute [equate] monoid.mul_one
-    variables {H : Type u} [group H] {x y z : H} 
-    @[equate] def II: (x * y)⁻¹ = y⁻¹ * x⁻¹ := by simp
-    @[equate] def inv_inv : x ⁻¹ ⁻¹ = x := by simp
-
-    open tactic
-
-end group_theory
-
-namespace add_grp_theory 
-    attribute [equate] add_assoc
-    attribute [equate] add_left_neg
-    attribute [equate] add_right_neg
-    attribute [equate] zero_add
-    attribute [equate] add_zero
-    attribute [equate] add_comm
-    universe u
-    variables {A : Type u} [add_comm_group A] {x y z : A}
-    variables {B : Type u} [add_comm_group B]
-    @[equate] def sub_def : x - y = x + - y := by simp
-    @[equate] def sub_plus_plus_sub : - (x + y) = (-x + - y) := by simp
-    @[equate] def sub_sub_sub_sub : ( - x - - y) = - (x - y) := by simp
-    @[equate] def sub_zero : x - 0 = x := by simp
-    @[equate] def sub_sub : - - x= x := by simp
-end add_grp_theory
 
 namespace ring_theory
     universe u
     variables {R : Type u} [comm_ring R] {x y z a b c : R}
-    @[equate] def M1 : (x * y) * z = x * (y * z) := by apply mul_assoc
-    @[equate] def M3L : 1 * x = x := by apply one_mul
-    @[equate] def M3R : x * 1 = x := by apply mul_one
-    @[equate] def M4 : x * y = y * x := by apply mul_comm
-    @[equate] def S1 : (- x) * y = - (x * y) := by simp
-    @[equate] def S2 : x * -y = - (x * y) := by simp
-    @[equate] def D1 : x * (y + z) = (x * y) + (x * z) := by apply left_distrib
-    @[equate] def D2 : (y + z) * x = y * x + z * x := by apply right_distrib
     @[equate] def P1 : x ^ 0 = 1 := rfl
     @[equate] def P2 {n} : x ^ (nat.succ n) = x * x ^ n := rfl
     @[equate] def X2 : 2 * x = x + x  := by ring
@@ -100,22 +98,7 @@ namespace set_rules
 
 end set_rules
 namespace list_theory
-    universe u
-    open list
-    variables {α : Type u} {a h : α} {l t : list α}
-    @[equate] def nil_append : [] ++ l = l := rfl
-    @[equate] def append_cons : (h::t) ++ l = h:: (t ++ l) := rfl
-    @[equate] def rev_nil : reverse ([] : list α) = [] := rfl
-    @[equate] def append_nil : l ++ [] = l := begin induction l, refl, simp end
-    @[equate] theorem rev_cons (a : α) (l : list α) : reverse (a::l) = reverse l ++ [a] := 
-    begin
-            have aux : ∀ l₁ l₂, reverse_core l₁ l₂ ++ [a] = reverse_core l₁ (l₂ ++ [a]),
-            intro l₁, induction l₁, intros, refl,
-            intro, 
-            equate, 
-            symmetry,
-            equate
-    end
+
 end list_theory
 
 -- run_cmd (get_equate_rule_table >>= tactic.trace)

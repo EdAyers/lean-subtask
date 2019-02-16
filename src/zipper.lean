@@ -382,8 +382,8 @@ namespace zipper
 
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
     meta def lowest_uncommon_subterms (l : expr) (z : zipper) :=
-        minimal_monotone (λ z, 
-            if z.is_mvar || z.is_constant || z.no_locals then failure else do 
+        minimal_monotone (λ z,
+            if z.is_mvar || z.is_constant || z.no_local_consts then failure else do 
             --let o := expr.occurs z.current l,
             matches ← zipper.maximal_monotone (λ rz, (tactic.hypothetically' $ unify z.current rz.current) ) $ zipper.zip l,
             -- trace_m "lus: " $ (z,l,o, matches),

@@ -5,6 +5,8 @@ section rings
     variables {α : Type u} [comm_ring α] {a b c d e : α}
     example : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by equate
+    -- example : (a + b) * (a - b) = a * a - b * b := 
+    -- by equate
     example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
     by equate
     example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
