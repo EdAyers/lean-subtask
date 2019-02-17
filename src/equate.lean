@@ -1,4 +1,4 @@
-import .engine .policy
+import .engine2 .policy
 import algebra.group_power
 import tactic.ring
 /- A prototype version of the tactic. -/
@@ -23,7 +23,7 @@ meta def equate (names : list name := []) := do
     base ← get_equate_rule_table,
     bonus ← rule_table.of_names names,
     all ← rule_table.join bonus base,
-    tactic.timetac "time: " $ robot.run robot.score_policy all
+    tactic.timetac "time: " $ robot.run robot.caveman_policy all
 
 /- DEFAULT RULES: -/
 

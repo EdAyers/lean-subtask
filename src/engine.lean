@@ -47,19 +47,12 @@ meta def explore_strategy : action → M (list action)
 --   trace_m "explore_strategy: " $ children,
   explore_tasks (tree.zipper.children $ tree.zipper.grow children $ z) []
 
+/-- Add the given task as an achieved subtask. -/
 meta def push_achieved : task → Z → Z := map_item ∘ tree_entry.push_achieved
 /-- Fold over all of the achieved tasks above the current zipper. -/
 meta def mfold_achieved {T} [monad T] {α} (f : α → task → T α) : α → Z → T α
 |a z := z.strict_above.mfoldl (λ a t, list.mfoldl f a $ tree_entry.achieved $ t) a
 
-
-meta def trace_path : M unit := do
-    ce ← get_ce,
-    -- ppce ← pp ce,
-    path ← get_path,
-    -- trace path
-    r ← (ce::path).reverse.mmap (λ x, tactic.pp x),
-    trace $ (format.nest 2 $ format.join $ list.intersperse (format.line ++ "= ") $ r)
 
 /-- Given a zipper entry z,
   - If it's an achieved task, go up and repeat
@@ -139,6 +132,6 @@ meta def run (π : policy) (rt : rule_table) : conv unit := do
     let s : state := { lookahead := lookahead, rt := rt, path := [], bgc := bigrams},
     let t := task.CreateAll rhs,
     ⟨r,s⟩ ← state_t.run (explore $ zip $ tree.branch (tree_entry.task t []) []) s,
-    run_aux π s r 20
+    run_aux π s r 100
 
 end robot

@@ -18,6 +18,19 @@ meta def M.hypothetically' {α} : M α → M α := λ tac, ⟨λ s, do
     ⟨a,s⟩ ← tactic.hypothetically' $ state_t.run tac s,
     pure $ (a, s)
 ⟩
+/--All of the state in the monad. -/
+meta structure snapshot :=
+(robot_state : state)
+(tactic_state : tactic_state)
+meta def M.get_snapshot : M snapshot := do
+    robot_state ← get,
+    tactic_state ← tactic.read,
+    pure ⟨robot_state,tactic_state⟩
+meta def M.set_snapshot : snapshot → M unit
+|⟨robot_state,tactic_state⟩ := do
+    put robot_state,
+    tactic.write tactic_state
+
 meta def add_rule : rule → M unit := λ r, do
     s ← get,
     rt ← s.rt.insert r,
@@ -43,10 +56,13 @@ meta def run_conv : conv unit → M unit := λ c, do
       path := path 
     }
 
-meta structure evaluation :=
-(overall : ℤ)
-(ranking : list (action × ℤ))
+@[reducible] def score := ℤ
+meta def evaluation := list (action × score)
 
-meta def policy := list action → M evaluation
+meta structure policy :=
+-- higher is better
+(evaluate : list action → M evaluation)
+-- higher is better. The idea is that this represents a kind of 'entropy'.
+(get_overall_score : list (action × score) → M score)
 
 end robot

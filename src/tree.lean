@@ -50,6 +50,13 @@ def up : zipper α → option (zipper α)
 |⟨path.top _, c⟩ := none
 |⟨path.down a n l p,c⟩ := some $ zipper.mk p $ tree.branch a $ list.update_nth l n c
 
+def idx : zipper α → option ℕ
+|⟨path.top _, _⟩ := none
+|⟨path.down _ n _ _, _⟩ := some n
+
+def up_with_index : zipper α → option ((zipper α) × ℕ) 
+| z := option.bind (idx z) $ λ i, option.bind (up z) $ λ z, some (z,i)
+
 /-- Go up and remove the current branch from the resulting tree. -/
 def up_drop : zipper α → option (zipper α) 
 |⟨path.top _, c⟩ := none

@@ -1,9 +1,6 @@
 import .M .zipper .refine
 open ez tactic
 namespace robot
-meta def first_policy : policy
-|[] := failure
-|l := pure l
 
 meta def is_term : expr → tactic bool := λ e, do
     T ← infer_type e >>= instantiate_mvars,
@@ -77,8 +74,8 @@ meta def score_strategy : strategy → M int
      pure $ max (10 - d) 0
 |(strategy.Use r) := score_rule r
 
-meta def score_policy : policy
-|[] := pure ⟨0,[]⟩
+meta def caveman_evaluate :  list action → M evaluation
+|[] := pure []
 |l  := do
     -- when (l.length ≥ 10) (failure), -- [IDEA] too many _bad_ choices means we are better off backtracking.
     scores ← list.mmap (score_strategy ∘ prod.fst) l,
@@ -88,7 +85,7 @@ meta def score_policy : policy
     tactic.trace_m "\nscore: \n" $ scoreboard_pretty,
     tactic.trace " ",
     -- ⟨a,_⟩ ← list.maxby (prod.snd) $ list.zip l scores,
-    pure ⟨0,scoreboard⟩ -- [TODO]
+    pure scoreboard
 
     /- [TODO] give a human-tuned, ad-hoc score based on:
         - [ ] what previous strategies were chosen from? That is, suppose a strategy came up earlier, then it would be good to detect that it should be a good idea now.
@@ -102,5 +99,23 @@ meta def score_policy : policy
 
      -/ 
 
+
+/-- A simple scoring heuristic for lists of terms.
+    [TODO] For now this is just whatever works but there is some theory that can go in here.
+-/
+meta def caveman_overall_score : list (action × score) → M score
+|l  := do
+    let l := l.filter (λ x, x.2 ≥ -5),
+    match list.partition (λ x : _ × score, x.2 ≥ 0) l with
+    |⟨[],[]⟩ := pure $ -100 -- [TODO], special case: it's impossible?
+    |⟨[],negs⟩ := do
+        pure $ 10 - negs.length
+    |⟨xs,_⟩ := pure $ 10 - xs.length
+    end
+
+meta def caveman_policy : policy := 
+    { evaluate := caveman_evaluate
+    , get_overall_score := caveman_overall_score
+    }
 
 end robot

@@ -22,6 +22,7 @@ def list.maxby {α} (f : α → int) (l : list α) : option α :=
 prod.fst <$> list.foldl (λ (acc : option(α×ℤ)) x, let m := f x in option.cases_on acc (some ⟨x,m⟩) (λ ⟨_,m'⟩, if m < m' then acc else some ⟨x,m⟩)) none l
 def list.minby {α} (f : α → int) (l : list α) : option α :=
     list.maxby (has_neg.neg ∘ f) l
+def list.qsortby {α} (f : α → int) (l : list α) : list α := list.qsort (λ a b, f a < f b) l
 def list.singleton {α} : α → list α := λ a, [a]
 def list.first {α} (f : α → bool) : list α → option α
 |[] := none
