@@ -43,6 +43,10 @@ meta def run_conv : conv unit → M unit := λ c, do
       path := path 
     }
 
-meta def policy := list action → M (list action)
+meta structure evaluation :=
+(overall : ℤ)
+(ranking : list (action × ℤ))
+
+meta def policy := list action → M evaluation
 
 end robot

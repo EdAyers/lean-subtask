@@ -61,7 +61,9 @@ meta def unzip : zipper α → tree α := current ∘ option.repeat up
 def down : ℕ → zipper α → option (zipper α)
 |n ⟨p,tree.branch a l⟩ := zipper.mk (path.down a n l p) <$> list.nth l n
 |n ⟨p,tree.leaf a⟩ := none
-
+def down_all : zipper α → list (zipper α)
+|⟨p,tree.branch a l⟩ := list.mapi (λ i, zipper.mk $ path.down a i l p) $ l
+|⟨p,tree.leaf a⟩ := []
 def is_leaf : zipper α → bool |⟨p,leaf _⟩ := tt | _ := ff
 
 def children : zipper α → list (zipper α)

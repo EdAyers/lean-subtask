@@ -47,7 +47,6 @@ namespace task
 end task
 open task
 
-
 @[derive decidable_eq]
 meta inductive strategy : Type
 |Use : rule_app → strategy
@@ -88,7 +87,10 @@ namespace tree_entry
     meta instance has_lt : has_lt tree_entry := ⟨λ x y, lt x y⟩
     meta instance decidable_lt : decidable_rel ((<) : tree_entry → tree_entry → Prop) := by apply_instance
     meta def of_task : robot.task → tree_entry := λ t, tree_entry.task t []
+    meta def as_task : tree_entry → option robot.task |(tree_entry.task t _) := some t | _ := none
     meta def of_strat : robot.strategy → tree_entry := λ t, tree_entry.strat t []
+    meta def as_strat : tree_entry → option robot.strategy |(tree_entry.strat t _) := some t | _ := none
+    /-- Get the achieved child subtasks for this entry. -/
     meta def achieved : tree_entry → list robot.task | (tree_entry.strat _ a) := a | (tree_entry.task _ a) := a
     meta def map_achieved (f : list robot.task → list robot.task) : tree_entry → tree_entry 
     | (tree_entry.strat s a) := (tree_entry.strat s $ f a) | (tree_entry.task t a) := tree_entry.task t $ f a
