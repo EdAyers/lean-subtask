@@ -48,7 +48,9 @@ meta def run_conv : conv unit → M unit := λ c, do
         Once you apply a rule, we only have to find the newly available rules in the lookahead. 
      -/
     
-    lookahead ← rule_table.rewrites ce' state.rt, 
+    lookahead ← rule_table.rewrites ce' state.rt,
+    -- lookahead ← if lookahead.empty then rule_table.rewrites ce' state.rt {wilds:=tt} else pure lookahead,
+    -- tactic.trace_m "lookahead: " $ lookahead,
     let path := ce :: state.path,
     -- state_t.lift $ tactic.target >>= tactic.trace,
     put { state with 

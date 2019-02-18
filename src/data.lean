@@ -10,7 +10,7 @@ meta inductive task : Type
 /- passes when we remove the given term from the CE. 
 Generally this is only used when a variable appears in the CE but not 
 in the target and there are no rules explicitly removing the variable. -/
-|Destroy : expr → task
+|Destroy : ez.zipper → task
 |Merge : expr → task
 namespace task
     protected meta def code : task → ℕ
@@ -90,6 +90,7 @@ namespace tree_entry
     meta def as_task : tree_entry → option robot.task |(tree_entry.task t _) := some t | _ := none
     meta def of_strat : robot.strategy → tree_entry := λ t, tree_entry.strat t []
     meta def as_strat : tree_entry → option robot.strategy |(tree_entry.strat t _) := some t | _ := none
+    meta def is_strat : tree_entry → bool := option.is_some ∘ as_strat
     /-- Get the achieved child subtasks for this entry. -/
     meta def achieved : tree_entry → list robot.task | (tree_entry.strat _ a) := a | (tree_entry.task _ a) := a
     meta def map_achieved (f : list robot.task → list robot.task) : tree_entry → tree_entry 

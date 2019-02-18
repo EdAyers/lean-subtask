@@ -63,6 +63,11 @@ namespace submatch
             --trace_state,
             ra.instantiate_mvars
         )
+
+    meta def to_rule_app : submatch → tactic rule_app
+    |⟨r,z⟩ := do
+        ⟨ra,_⟩ ← rule_app.of_rule r,
+        rule_app.head_rewrite ra z
         
     meta instance : has_to_tactic_format (submatch) := ⟨λ ⟨r,z⟩, pure (λ pr pz, "{" ++ pr ++ "," ++ format.line ++ pz ++ " }") <*> tactic.pp r <*> tactic.pp z⟩
 end submatch
@@ -115,7 +120,9 @@ namespace rule_table
         -- trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
         t.mfold (λ acc r, (do 
             (ra,_) ← rule_app.of_rule r,
-            ra ← rule_app.head_rewrite ra lhs, 
+            ra ← 
+                --timetac "rw" $ 
+                rule_app.head_rewrite ra lhs, 
             pure $ ra :: acc
             ) <|> pure acc
         ) []
@@ -126,7 +133,10 @@ namespace rule_table
     private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) 
     : zipper → list rule_app → tactic (list rule_app)
     |z acc := do
-        hrs ← head_rewrites z.current rt cfg,
+        hrs ← 
+            --timetac "head_rewrites: " $ 
+            head_rewrites z.current rt cfg,
+        -- tactic.trace_m "rewrites_aux: " $ hrs,
         hrs ← list.mchoose (λ rw, rule_app.head_rewrite rw z) hrs,
         acc ← pure $ hrs ++ acc,
         ⟨f,children⟩ ← z.down_proper,
@@ -148,6 +158,11 @@ namespace rule_table
         if (key = `rule_table.app) 
         then list.mchoose (robot.submatch.run_app e) submatches
         else list.mchoose (robot.submatch.run e) submatches
+    meta def submatch_lhs : expr → rule_table → tactic(list rule_app) | lhs rt := do
+        rs ← submatch lhs rt,
+        pure rs
+        -- rs.mmap rule_app.flip
+
 
 end rule_table
 

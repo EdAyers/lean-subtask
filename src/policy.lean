@@ -53,7 +53,7 @@ meta def score_rule (r : rule_app) : M int := do
             <$> list.empty 
             <$> list.mchoose (λ x : rule_app, 
                 state_t.lift 
-                $ tactic.hypothetically' 
+                --$ tactic.hypothetically' 
                 $ (do 
                     zipper.find_subterm r.lhs (zipper.zip $ rule_app.rhs x), 
                     pure x)
@@ -77,7 +77,6 @@ meta def score_strategy : strategy → M int
 meta def caveman_evaluate :  list action → M evaluation
 |[] := pure []
 |l  := do
-    -- when (l.length ≥ 10) (failure), -- [IDEA] too many _bad_ choices means we are better off backtracking.
     scores ← list.mmap (score_strategy ∘ prod.fst) l,
     scoreboard ← pure $ list.zip l scores,
     let scoreboard := scoreboard.qsort (λ x y, x.2 > y.2),
@@ -104,13 +103,14 @@ meta def caveman_evaluate :  list action → M evaluation
     [TODO] For now this is just whatever works but there is some theory that can go in here.
 -/
 meta def caveman_overall_score : list (action × score) → M score
+|[x] := pure $ 10
 |l  := do
     let l := l.filter (λ x, x.2 ≥ -5),
     match list.partition (λ x : _ × score, x.2 ≥ 0) l with
     |⟨[],[]⟩ := pure $ -100 -- [TODO], special case: it's impossible?
     |⟨[],negs⟩ := do
-        pure $ 10 - negs.length
-    |⟨xs,_⟩ := pure $ 10 - xs.length
+        pure $ 5 - negs.length
+    |⟨xs,_⟩ := pure $ 5 - xs.length
     end
 
 meta def caveman_policy : policy := 

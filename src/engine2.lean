@@ -59,8 +59,9 @@ meta def mfold_achieved {T} [monad T] {α} (f : α → task → T α) : α → Z
 
 /-- Perform a step of the engine. The engine is implemented as a state machine with the states listed in `engine_mode`.
     It used to be a load of recursive functions but it was difficult to tweak and reason about.  -/
-meta def step (π : policy) : engine_state → M engine_state := λ estate,
-let z := estate.cursor in
+meta def step (π : policy) : engine_state → M engine_state := λ estate, do
+let z := estate.cursor,
+ppz ← pp_item_with_indent z,
 match estate.mode with
 |Explore := do
     ppz ← pp_item_with_indent z,
@@ -105,7 +106,6 @@ match estate.mode with
         end
     )
 |Execute s := do
-    ppz ← pp_item_with_indent z,
     tactic.trace_m "execute: " ppz,
     state ← get,
     ce ← get_ce,
@@ -113,11 +113,12 @@ match estate.mode with
         ce' ← get_ce,
         path ← get_path,
         -- now we do some sanity tests that it was a good idea to do this
-        (do when (ce' ∈ path.tail) (fail "loop detected."),
+        (do when (ce' ∈ path.tail) (trace_m  "loop detected: " ce' *> failure),
             mfold_achieved (λ _ ach, do
                 r ← ach.test ce',
                 -- tactic.trace_m "test:" $ (r, ach, ce', s),
-                when (¬r) (fail "strategy caused a previously achieved task to fail")
+                
+                when (¬r) (trace "strategy caused a previously achieved task to fail" *> failure)
             ) () z,
             targ ← target,
             trace targ,
@@ -131,6 +132,7 @@ match estate.mode with
         estate.with Explore  z
     )
 |Ascend := do
+    tactic.trace " ascend",
     match z.item with
     |(tree_entry.task t _) := do
         ce ← get_ce,
@@ -148,11 +150,16 @@ match estate.mode with
     |(tree_entry.strat s _) := estate.with (Execute s) z
     end
 |Right := do
-    ⟨z,i⟩ ← tree.zipper.up_with_index z,
+    trace_m "  right: " $ ppz,
+    some ⟨z,i⟩ ← pure $ tree.zipper.up_with_index z | estate.with Backtrack z,
     (do z ← down (i + 1) z,
+        if z.item.is_strat then estate.with Right z else        
         estate.with Explore z 
     ) 
-    <|> estate.with Right z
+    <|> (
+        if z.item.is_strat then estate.with Backtrack z else do
+        estate.with Right z
+    )
 |Backtrack := do
     trace "backtrack",
     /- 
@@ -168,11 +175,14 @@ match estate.mode with
        [TODO] Maybe there is a way of retaining what we learned on this branch?
      -/
     let backtracks := estate.backtracks,
-    (⟨score,candidates,snapshot⟩::backtracks) ← pure $ list.reverse $ list.qsortby (λ mem, memento.score mem) backtracks | failure,
+    (⟨entropy,candidates,snapshot ⟩::backtracks) ← pure $ list.reverse $ list.qsortby (λ mem, memento.score mem) backtracks | failure,
     ⟨⟨s,sz⟩,score⟩ :: candidates ← pure $ candidates 
         | pure $ {engine_state . mode := Backtrack, cursor := z, backtracks := backtracks},
     -- [TODO] if candidate list is empty, this tells us that the parent subtask is impossible.
     --        this means we can go up to the ancestor strategy and remove that too. For now just discard it.
+    entropy' ← policy.get_overall_score π candidates,
+    sn ← pure snapshot, 
+    backtracks ← pure $ {memento . score := entropy', candidates := candidates, snapshot := sn} :: backtracks,
     M.set_snapshot snapshot,
     pure $ {engine_state . mode := Execute s, cursor :=sz, backtracks := backtracks}
 |Done := fail "already done!"

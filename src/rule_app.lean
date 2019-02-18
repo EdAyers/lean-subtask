@@ -68,7 +68,9 @@ meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
   rhs ← tactic.mk_meta_var T,
   target ← tactic.mk_app `eq [lhs.current,rhs],
   pf ← tactic.fabricate target (do
-    tactic.apply_core r.pf,
+    -- [FIXME] `apply_core` is the performance bottleneck.
+    --timetac "apply_core" $ 
+    tactic.apply_core r.pf {md := transparency.none, unify := tt},
     all_goals $ try (apply_instance <|> prop_assumption),
     pure ()
   ),
@@ -116,6 +118,17 @@ meta def is_commuter (r : rule_app) : tactic bool := r.r.is_commuter
 meta def count_metas (r : rule_app) : tactic nat := do
         lhs ← tactic.instantiate_mvars r.lhs,
         pure $ table.size $ expr.fold r.lhs (table.empty) (λ e _ t, if expr.is_mvar e then table.insert e t else t)
+
+meta def flip (ra : rule_app) : tactic rule_app := do
+  rf ← rule.flip ra.r,
+  pf ← mk_eq_symm ra.pf,
+  pure {
+    r := rf,
+    rhs := ra.lhs,
+    lhs := ra.rhs,
+    adr := ra.adr,
+    pf := pf
+  }
 
 
 end rule_app

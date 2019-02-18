@@ -34,7 +34,7 @@ attribute [equate] mul_right_inv
 attribute [equate] one_mul
 attribute [equate] mul_one
 attribute [equate] inv_inv
-attribute [equate] mul_inv
+@[equate] lemma mul_inv {G:Type*} [group G] {a b : G} : (a * b) ⁻¹ = b⁻¹ * a⁻¹ := by simp 
 
 attribute [equate] add_assoc
 attribute [equate] add_left_neg
@@ -48,7 +48,6 @@ attribute [equate] neg_neg
 attribute [equate] sub_self
 attribute [equate] sub_eq_add_neg
 attribute [equate] zero_sub
--- attribute [equate] neg_sub -- [TODO] one of the exercises is to show this, so there should be a way of telling `equate` to omit rules.
 attribute [equate] sub_zero
 attribute [equate] sub_neg_eq_add
 -- attribute [equate] add_sub_assoc

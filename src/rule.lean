@@ -32,6 +32,7 @@ meta structure rule := -- relation is always `=` for now.
 (rhs  : expr)
 (type : expr)
 (pf   : expr) -- the proof expression of the given rule.
+(was_flipped : option (name × expr))
 
 namespace rule
     meta instance has_lt : has_lt rule := ⟨λ r1 r2, (r1.lhs,r1.rhs) < (r2.lhs,r2.rhs)⟩
@@ -52,9 +53,11 @@ namespace rule
         -- trace t, 
         ⟨ctxt,`(%%lhs = %%rhs)⟩ ← pure $ telescope.of_pis t 
         | (do pft ← pp pf, ppt ← pp t, fail $ (to_fmt "rule.of_prf: supplied expression ") ++ pft ++ " : " ++ ppt ++ " is not an equality proof "),
-        pure {id := id, ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf, type := t}
+        pure {id := id, ctxt := ctxt, lhs := lhs, rhs := rhs, pf := pf, type := t, was_flipped := none}
 
-    meta def flip (r : rule) : tactic rule := do
+    meta def flip (r : rule) : tactic rule := 
+    match r.was_flipped with
+    |none := do
         let P := r.ctxt.foldl (λ e ⟨n,b,y⟩, expr.pi n b (to_pexpr y) e) $ ```(%%r.rhs = %%r.lhs),
         T ← to_expr $ P,
         pf ← tactic.fabricate (some T) (do
@@ -70,7 +73,10 @@ namespace rule
              , type := r.type
              , pf   := pf
              , id := r.id ++ `flipped
+             , was_flipped := some (r.id, r.pf)
              }
+    |some pf := of_prf pf.1 pf.2
+    end
 
     -- meta def add_simp_lemma : simp_lemmas → rule → tactic simp_lemmas := λ sl r, simp_lemmas.add sl r.pf
     meta def is_wf (r : rule) : tactic bool := do r' ← of_prf r.id $ pf $ r, pure $ r = r'

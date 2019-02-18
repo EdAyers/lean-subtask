@@ -49,7 +49,18 @@ meta def path.to_coord : path → coord
 |(path.elet_body _ _ _ _)       := coord.elet_body
 
 meta def path.to_address : list path → address := list.map path.to_coord ∘ list.reverse
-
+open tactic 
+meta def path.to_tactic_format : path → tactic format
+|(path.app_left l r)            := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
+|(path.app_right l r)           := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
+|(path.lam_var_type n _ y b)    := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+|(path.lam_body n _ y b)        := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+|(path.pi_var_type n _ y b)     := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+|(path.pi_body n _ y b)         := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+|(path.elet_type n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+|(path.elet_assignment n y a b) := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+|(path.elet_body n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+meta instance path.has_to_tactic_format : has_to_tactic_format path := ⟨path.to_tactic_format⟩
 /-- A context entry for the zipper's cursor. 
 In the current implementation; as zippers traverse below lambdas, 
 pis and elets, they don't replace de-Bruijn indices with local constants.
@@ -341,7 +352,7 @@ namespace zipper
     meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e,
         maximal_monotone (λ z,
             if z.is_mvar || z.is_constant then failure
-            else tactic.hypothetically' (unify e z.current) *> pure z
+            else tactic.hypothetically' (unify e z.current transparency.none) *> pure z
         ) E
 
     meta def has_occurences : zipper → expr → tactic bool 
@@ -407,7 +418,7 @@ namespace zipper
 
     meta def does_unify (e : expr) : zipper → tactic unit
     | z := if z.is_mvar then failure else
-        (tactic.hypothetically' $ unify e z.current)
+        (tactic.hypothetically' $ unify e z.current transparency.none ff)
 
     meta def find_subterms (e : expr) : zipper → tactic (list zipper)
     := traverse_proper (λ acc z, (does_unify e z *> pure (z::acc)) <|> pure acc) []
@@ -417,6 +428,12 @@ namespace zipper
 
     meta def count_subterms (e : expr) : zipper → tactic ℕ
     := λ z, do xs ← find_subterms e z, pure $ list.length xs
+
+    meta def find_non_unify_subterm (e : expr) : zipper → tactic zipper
+    |z :=
+        if e = z.current then pure z else do
+        (_,zs) ← down_proper z,
+        list.mfirst find_non_unify_subterm zs
 
     meta def find_subterm (e : expr) : zipper → tactic zipper
     |z :=
@@ -473,6 +490,11 @@ namespace zipper
         e ← tactic.instantiate_mvars e,
         z ← down_address a e,
         pure z
+
+    /-- Returns true when everything in the zippers except the cursor terms are equal. -/
+    meta def above_equal : zipper → zipper → tactic bool
+    |z₁ z₂ := do 
+          list.meq_by (λ x y, pure $ x = y) z₁.path z₂.path
 
     -- meta def clone_mvars : zipper → tactic (zipper)
     -- |z := do 

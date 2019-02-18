@@ -33,6 +33,15 @@ def list.msome {T} [monad T] {α} (f : α → T bool) : list α → T bool
 |[] := pure ff
 |(h::t) := f h >>= λ x, if x then pure tt else list.msome t
 def list.collect {β} (f : α → list β) : list α → list β := λ l, list.bind l f
+def list.eq_by {α β} (f : α → β → bool) : list α → list β → bool
+|[] [] := tt
+|(h₁::t₁) (h₂::t₂) := f h₁ h₂ && list.eq_by t₁ t₂
+| _ _ := ff
+def list.meq_by {T} [monad T] {α β} (f : α → β → T bool) : list α → list β → T bool
+|[] [] := pure tt
+|(h₁::t₁) (h₂::t₂) := do r ← f h₁ h₂, if r then list.meq_by t₁ t₂ else pure ff
+|_ _ := pure ff
+
 meta def option.repeat {α} (f : α → option α) : α → α
 |a := option.get_or_else (option.repeat <$> f a) a
 
