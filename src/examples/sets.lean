@@ -15,7 +15,7 @@ section sets
     by equate
     @[equate] def A7l : (B ∪ C) ∩ A = (B ∩ A) ∪ (C ∩ A) := 
     by equate
-    example : (A ∪ B) \ A = B 
+    example : (A ∪ B) \ A = B \ A
     := by equate
     example : (A ∪ B) \ C = A \ C ∪ B \ C
     := by equate

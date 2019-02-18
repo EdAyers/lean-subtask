@@ -71,6 +71,9 @@ def down : ℕ → zipper α → option (zipper α)
 def down_all : zipper α → list (zipper α)
 |⟨p,tree.branch a l⟩ := list.mapi (λ i, zipper.mk $ path.down a i l p) $ l
 |⟨p,tree.leaf a⟩ := []
+/-- Go down on all children whose index is strictly less than the given `i`. -/
+def down_all_lt (i : ℕ) : zipper α → list (zipper α) 
+:= list.take i ∘ down_all
 def is_leaf : zipper α → bool |⟨p,leaf _⟩ := tt | _ := ff
 
 def children : zipper α → list (zipper α)
@@ -107,6 +110,12 @@ meta def pp_item_with_indent [has_to_tactic_format α] : zipper α → tactic fo
   pa ← tactic.pp z.item,
   n ← pure $ z.depth,
   pure $ (format.join $ list.repeat " " n) ++ pa
+
+meta def get_non_failures {T} [monad T] [alternative T] {β} (f : zipper α → T β) : zipper α → T (list β)
+|z := (list.singleton <$> f z) <|> (list.mcollect get_non_failures $ down_all z)
+
+-- meta def mfold {T} [monad T] [alternative T] {β} (f : β → zipper α → T β) : β → zipper α → T β
+-- |b z := (do b ← f b z, ch ← pure $ down_all z, list.mfoldl mfold b $ down_all z) <|> pure b
 
 end zipper
 end tree

@@ -36,8 +36,10 @@ section group_homs1
     := by equate
     def conj (h x : G) := h * x * h ⁻¹ 
     @[equate] lemma conj_def : conj h x = h * x * h ⁻¹ := rfl
-    example {h : G} : conj h (x) * conj h (y) = conj h (x * y) := by equate
-    example {h : G} : conj h (x * y) = conj h x * conj h y := by equate
+    example {h : G} : conj h (x) * conj h (y) = conj h (x * y) := 
+    by equate
+    example {h : G} : conj h (x * y) = conj h x * conj h y := 
+    by equate
     example : x * y⁻¹ = (y * x⁻¹)⁻¹
     := by equate
     example :  (y * x⁻¹)⁻¹ = x * y⁻¹

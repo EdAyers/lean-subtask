@@ -1,22 +1,25 @@
 import .M .zipper
 namespace robot
 open strategy task tactic robot.tactic ez
--- meta def strategy.merge : strategy → strategy → M strategy 
--- |(Use r₁) (Use r₂) := do
---     r ← hypothetically' (do 
---         unify r₁.lhs r₂.lhs,
---         unify r₁.rhs r₂.rhs, 
---         rule.instantiate_mvars r₁
---     ),
---     pure $ Use r
--- |_ _ := failure
+meta def strategy.merge : strategy → strategy → M strategy 
+|(Use r₁) (Use r₂) := do
+    r ← hypothetically' (do 
+        unify r₁.lhs r₂.lhs,
+        unify r₁.rhs r₂.rhs, 
+        rule_app.instantiate_mvars r₁
+    ),
+    pure $ Use r
+|_ _ := failure
 
 meta def destroy_test : zipper → expr → M bool
 |e c := 
     (do 
         cez ← zipper.down_address e.address c,
         eq_above ← zipper.above_equal cez e,
-        if eq_above then pure ff else failure
+        guard (eq_above),
+        e_locals ← list_local_const_terms e.current,
+        cez_locals ← list_local_const_terms cez.current,
+        pure $ e_locals.any (∉ cez_locals)
     )
     <|>
     (hypothetically' (ez.zipper.find_subterm e.current c *> pure ff)) <|> pure tt
@@ -160,10 +163,10 @@ match t with
     --     pure $ ([], strategy.Use <$> hrws)
     -- else do
     let primaries := (λ p : ℕ × zipper, task.Create p.1 p.2.current) <$> scs,
-    secondaries ← list.mchoose (λ p : _ × _, do
-        z ← zipper.up p.2,
-        pure $ task.Create p.1 z.current
-     ) scs,
+    -- secondaries ← list.mchoose (λ p : _ × _, do
+    --     z ← zipper.up p.2,
+    --     pure $ task.Create p.1 z.current
+    --  ) scs,
 
     -- find the smallest absent subterms on the LHS bit not RHS
     rscs ← zipper.smallest_absent_composite_subterms a ce,
@@ -177,7 +180,7 @@ match t with
     -- trace_m "lhs_lcs: " $ lhs_lcs,
     rhs_lcs ← list_local_const_terms a,
     to_annihilate ← pure $ list.map task.Annihilate $ lhs_lcs.filter (∉ rhs_lcs),
-    let scs := primaries ++ to_annihilate ++ secondaries ++ to_destroy,
+    let scs := primaries  ++ to_destroy ++ to_annihilate,
     pure $ (scs, [])
 |(task.Annihilate x) := do
     ce ← get_ce, rt ← get_rule_table,
@@ -198,7 +201,7 @@ match t with
             pure $ sum.inl r
         ) <|> (pure $ sum.inr r)
     ) submatches,
-    trace (breakups,rewrites),
+    --trace (breakups,rewrites),
     if breakups.empty then pure $ ([], list.map Use rewrites) else
     pure $ ([], list.map Use breakups)
 
@@ -230,7 +233,7 @@ meta def strategy.refine : strategy → M refinement
 |(strategy.Use r)              := do
     ce ← get_ce,
     scs ← zipper.smallest_absent_subterms ce r.lhs,
-
+    scs ← pure $ if scs.empty then [(1,zipper.zip r.lhs)] else scs,
     -- subs : list zipper ← zipper.minimal_monotone (λ lz,
     --     if lz.is_mvar || lz.is_constant then failure else do
     --     --⟨r,ms⟩ ← rule.to_mvars r,

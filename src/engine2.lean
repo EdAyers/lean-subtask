@@ -80,14 +80,14 @@ match estate.mode with
     -- extract the child zippers.
     actions : list action      ← pure $ list.choose (λ z, (λ s, (s,z)) <$> (as_strat $ item z)) $ tree.zipper.down_all $ z,
     subtasks : list (task × Z) ← pure $ list.choose (λ z, (λ s, (s,z)) <$> (as_task  $ item z)) $ tree.zipper.down_all $ z,
+        candidates ← π.evaluate actions | failure,
+        overall_score ← π.get_overall_score candidates,
     ( do
         -- In this case, there is at least one sub-strategy.
-        candidates@(⟨⟨s,sz⟩,s_score⟩::others) ← π.evaluate actions | failure,
-        overall_score ← π.get_overall_score candidates,
         -- [TODO] cross-check the actions here with actions found on previously explored branches of the subtask tree.
         --        Perhaps this should be done in the policy?
         if overall_score > 0 then do
-            -- 
+            (⟨⟨s,sz⟩,s_score⟩::others) ← pure candidates | failure,
             others_overall_score ← π.get_overall_score others, 
             snapshot ← M.get_snapshot,
             pure { mode := Execute s
@@ -101,7 +101,12 @@ match estate.mode with
     ) <|> (do 
         -- we couldn't find any good strategies to achieve this node.
         match subtasks with
-        |[] := estate.with Right z
+        |[] := do
+            snapshot ← M.get_snapshot,
+            pure {
+                mode := Right, cursor := z,
+                backtracks := ⟨overall_score,candidates,snapshot⟩ :: engine_state.backtracks estate
+            }
         |(⟨t,tz⟩ :: rest) := estate.with Explore tz
         end
     )
@@ -177,7 +182,7 @@ match estate.mode with
     let backtracks := estate.backtracks,
     (⟨entropy,candidates,snapshot ⟩::backtracks) ← pure $ list.reverse $ list.qsortby (λ mem, memento.score mem) backtracks | failure,
     ⟨⟨s,sz⟩,score⟩ :: candidates ← pure $ candidates 
-        | pure $ {engine_state . mode := Backtrack, cursor := z, backtracks := backtracks},
+        | pure $ {engine_state . mode := Right, cursor := z, backtracks := backtracks},
     -- [TODO] if candidate list is empty, this tells us that the parent subtask is impossible.
     --        this means we can go up to the ancestor strategy and remove that too. For now just discard it.
     entropy' ← policy.get_overall_score π candidates,

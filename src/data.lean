@@ -118,7 +118,9 @@ meta structure state :=
 (bgc : bigram_cache)
 
 meta def refinement := list task × list strategy
-meta def action := (strategy × task_zipper)
+meta def action := (strategy × Z)
 meta instance : has_to_tactic_format action := ⟨λ ⟨s,_⟩, tactic.pp s⟩
+
+meta def as_action : Z → option action := λ z, z.item.as_strat >>= λ s, pure (s,z)
 
 end robot

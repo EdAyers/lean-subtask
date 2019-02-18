@@ -94,6 +94,7 @@ namespace set_rules
     @[equate] def A13 : A ∩ set.univ = A := ext $ λ _, and_true _
     @[equate] def A14 : A ∩ A = A := ext $ λ a, ⟨λ ⟨x,y⟩, x, λ x, ⟨x,x⟩⟩
     @[equate] def A15 : A ∪ A = A := ext $ λ a, ⟨λ xy, or.rec_on xy id id, or.inl⟩
+    @[equate] def A16 : A \ A = ∅ := ext $ λ a, ⟨λ ⟨x,y⟩, y x, λ x, false.rec_on _ x⟩
 
 end set_rules
 namespace list_theory

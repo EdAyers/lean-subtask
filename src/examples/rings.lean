@@ -16,8 +16,13 @@ section rings
     by equate 
     example : a * b + b * c = (a + c) * b := 
     by equate
-    example : (a * b) - c + (b * a) = - c + a * (b + b) := 
-    by equate  
     example : (a + c) * b = a * b + b * c := 
     by equate
+    
+    example : (a * b) - c + (b * a) = - c + 2 * (a *  b) := 
+    by equate  
+    example : (a * b) - c + (b * a) = - c + (2 * a) *  b := 
+    by equate  
+    example : (a * b) - c + (b * a) = - c + a * (b + b) := 
+    by equate  
 end rings

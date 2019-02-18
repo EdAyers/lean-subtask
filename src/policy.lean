@@ -35,7 +35,22 @@ meta def requires_nonmeta_variable_present_in_rule (r : rule) : M nat := do
      /- I feel like this one will just always be true. 
      A better refinement would be:  
      -/
+
+meta def get_candidate_actions : Z → M (list action)
+:= tree.zipper.get_non_failures (λ z, as_action z) 
+
+meta def get_sister_candidate_actions_aux : Z → list action → M (list action)
+|z acc := do
+    some (z,i) ← pure $ tree.zipper.up_with_index z | pure acc,
+    cs ← list.mcollect get_candidate_actions $ list.take i $ z.down_all,
+    acc ← pure $ cs ++ acc,
+    if z.item.is_strat then pure acc else do
+    get_sister_candidate_actions_aux z acc
      
+meta def get_merger_actions : list action → list action → M ( list action)
+|l₁ l₂ := list.mcollect (λ a₁ : action, list.mchoose (λ a₂ : action, strategy.merge a₁.1 a₂.1 >>= λ s, pure (s,a₂.2)) l₂) l₁
+
+
 meta def score_rule (r : rule_app) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 
@@ -48,7 +63,7 @@ meta def score_rule (r : rule_app) : M int := do
     let symm_diff := table.size (ce_symbs ∪ lhs_symbs) - overlap,
     -- [TODO] if the LHS is in the lookahead table then use that
     has_diom ← 
-        if ¬ expr.is_composite r.lhs then pure ff else
+        if ¬ expr.is_composite r.r.lhs then pure ff else
             bnot 
             <$> list.empty 
             <$> list.mchoose (λ x : rule_app, 
@@ -76,7 +91,11 @@ meta def score_strategy : strategy → M int
 
 meta def caveman_evaluate :  list action → M evaluation
 |[] := pure []
-|l  := do
+|l@(⟨s,sz⟩::t)  := do
+    -- sisters ← get_sister_candidate_actions_aux sz [],
+    -- mergers ← get_merger_actions sisters l,
+    -- trace mergers,
+
     scores ← list.mmap (score_strategy ∘ prod.fst) l,
     scoreboard ← pure $ list.zip l scores,
     let scoreboard := scoreboard.qsort (λ x y, x.2 > y.2),

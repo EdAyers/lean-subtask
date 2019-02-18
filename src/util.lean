@@ -159,6 +159,8 @@ def list.mchoose {T} [alternative T] (f : α → T β) : list α → T (list β)
 |(h::t) := pure (λ fh rest, option.cases_on fh rest (λ fh,fh::rest)) 
             <*> (some <$> f h <|> pure none) 
             <*> list.mchoose t
+def list.mcollect {T} [monad T] (f : α → T (list β)) : list α → T (list β)
+|l := list.mfoldl (λ acc x, (++ acc) <$> f x) [] l
 
 private meta def list.partition_many_aux {α} (equ : α → α → bool) : list α → list (list α) → list (list α) 
 |(h::t) acc := let ⟨eqs,non_eqs⟩ := list.partition (λ x, equ h x) t in list.partition_many_aux non_eqs (eqs :: acc)
