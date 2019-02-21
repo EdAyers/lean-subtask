@@ -6,7 +6,9 @@ section
     variables {α : Type u} {a h : α} {l t s : list α}
     @[equate] def nil_append : [] ++ l = l := rfl
     @[equate] def append_cons : (h::t) ++ l = h:: (t ++ l) := rfl
+    @[equate] def reverse_def : reverse l = reverse_core l [] := rfl
     @[equate] def rev_nil : reverse ([] : list α) = [] := rfl
+    @[equate] def reverse_core_def : reverse_core (h :: t) l = reverse_core t (h :: l) := rfl
     @[equate] def append_nil : l ++ [] = l := begin induction l, refl, simp end
     @[equate] theorem rev_cons (a : α) (l : list α) : reverse (a::l) = reverse l ++ [a] := 
     begin

@@ -6,8 +6,12 @@ section rings
     attribute [equate] neg_sub 
 
     variables {α : Type u} [comm_ring α] {a b c d e : α}
-    example : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
+    lemma sumsq_1 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by equate
+    lemma sumsq_2 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
+    by ring
+    #print sumsq_1
+    #print sumsq_2
     -- example : (a + b) * (a - b) = a * a - b * b := 
     -- by equate
     example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
