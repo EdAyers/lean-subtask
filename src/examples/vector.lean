@@ -48,6 +48,9 @@ example (il : is_linear A) :
 example (il : is_linear A) : 
     ⟪A† x + A† y ,z⟫ = ⟪A† (x + y), z⟫ := 
 by equate 
+example (il : is_linear A) : 
+    ⟪(x + y),  A z⟫ = ⟪A† x + A† y ,z⟫ := 
+by equate 
 
 @[equate] lemma adj_linear (il : is_linear A) : 
     ⟪A† (x + y), z⟫ = ⟪A† x + A† y ,z⟫ := 

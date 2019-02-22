@@ -12,7 +12,6 @@ section rings
     by equate
     @[equate] lemma sub_minus : - (a - b) = - a - - b := by equate
     -- comparison with new lemma added
-    variables {α : Type u} [comm_ring α] {a b c d e : α}
     lemma sumsq_1 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by equate
     lemma sumsq_2 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
