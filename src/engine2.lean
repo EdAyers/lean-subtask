@@ -29,13 +29,31 @@ open tree_entry
 /--Returns true if the given task is already present strictly above the current position. -/
 meta def has_task : Z → task → tactic bool
 |z t := (bnot ∘ list.empty) <$> (z.strict_above.mfilter $ tree_entry.is_eq (tree_entry.task t []))
+
+/-- `fits l r` Returns true if the left item's mvars can be filled in to be defeq with `r` -/
+meta def fits : expr → expr → tactic bool
+|r l := (do
+    r' ← hypothetically' (do
+        unify l r transparency.none,
+        instantiate_mvars r
+    ),
+    pure $ r = r') <|> pure ff
+
 /--Returns true if the given strategy is already present strictly above the current position.
    [HACK] If the strategy is a `Use`, it also makes sure that the flip of the rule_app is not present.
  -/
 meta def has_strat : Z → strategy → tactic bool
 |z (strategy.Use r) := (bnot ∘ list.empty) <$> 
     (z.strict_above.mfilter $ ( λ x, match x with
-        |(tree_entry.strat (strategy.Use r₂) _) := pure $ r = r₂ ∨ (r.lhs = r₂.rhs ∧ r.rhs = r₂.lhs) 
+        |(tree_entry.strat (strategy.Use r₂) _) := (do
+            fr ← fits r.lhs r₂.lhs,
+            fr2 ← fits r.rhs r₂.rhs,
+            if fr && fr2 then pure tt else do
+            fl ← fits r.lhs r₂.rhs,
+            fl2 ← fits r.rhs r₂.lhs,
+            if fl && fl2 then pure tt else pure ff
+
+            ) <|> pure ff
         |_ := pure ff
         end
     ))

@@ -38,6 +38,9 @@ by equate
 example (il : is_linear A) : 
     ⟪A† (x + y) + w, z⟫ = ⟪A† x + A† y + w ,z⟫ := 
 by equate 
+example (il : is_linear A) : 
+    ⟪A† (x + y) + (w + v), z⟫ = ⟪A† x + v + A† y + w,z⟫ := 
+by equate 
 example (il : is_linear A) :
     ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
 := by equate
