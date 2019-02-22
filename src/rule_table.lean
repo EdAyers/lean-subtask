@@ -116,13 +116,12 @@ namespace rule_table
         let wilds := if cfg.wilds then get_head_rewrites `rule_table.wildcard rt else ∅,
         let keyed := get_head_rewrites k rt,
         let t := wilds ∪ keyed,
-        -- kpp ← pp k, tpp ← pp t,
-        -- trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
+        --  kpp ← pp k, tpp ← pp t,
+        --  trace $ ("getting key ":format) ++ kpp ++ " with rules " ++ tpp,
         t.mfold (λ acc r, (do 
-            (ra,_) ← rule_app.of_rule r,
-            ra ← 
-                --timetac "rw" $ 
-                rule_app.head_rewrite ra lhs, 
+            ppr ← to_string <$> pp r,
+            -- tactic.trace_m "hr: " $ ppr,
+            ra ← rule_app.rule_rewrite r lhs,
             pure $ ra :: acc
             ) <|> pure acc
         ) []
@@ -133,8 +132,9 @@ namespace rule_table
     private meta def rewrites_aux (rt : rule_table) (cfg : rewrites_config) 
     : zipper → list rule_app → tactic (list rule_app)
     |z acc := do
+        ppz ← to_string <$> pp z,
         hrs ← 
-            --timetac "head_rewrites: " $ 
+            -- timetac ("head_rewrites: " ++ ppz) $ 
             head_rewrites z.current rt cfg,
         -- tactic.trace_m "rewrites_aux: " $ hrs,
         hrs ← list.mchoose (λ rw, rule_app.head_rewrite rw z) hrs,

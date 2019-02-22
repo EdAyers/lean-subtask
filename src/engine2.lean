@@ -127,7 +127,7 @@ match estate.mode with
             }
         |(⟨t,tz⟩ :: rest) := estate.with Explore tz
         end
-    )
+    ) 
 |Execute s := do
     tactic.trace_m "execute: " ppz,
     state ← get,
@@ -152,6 +152,7 @@ match estate.mode with
         <|> estate.with Backtrack z
     ) 
     <|> (do -- strategy execution failed.
+        -- [TODO] sometimes this is unrecoverable: eg using a group hom law when it is not a group hom.
         estate.with Explore  z
     )
 |Ascend := do
@@ -243,7 +244,7 @@ meta def run (π : policy) (rt : rule_table) : conv unit := do
     lookahead ← rt.rewrites lhs,
     let s :state := {lookahead := lookahead, rt := rt, path := [], bgc := bigram.empty},
     let t := task.CreateAll rhs,
-    --⟨r,s⟩ ← state_t.run (explore $  ) s,
+    -- ⟨r,s⟩ ← state_t.run (explore $  ) s,
     let estate : engine_state := {cursor := zip $ tree.branch (tree_entry.task t []) [], backtracks := [], mode := Explore},
     ⟨estate,s⟩ ← state_t.run (run_aux π 100 estate) s,
     reflexivity,

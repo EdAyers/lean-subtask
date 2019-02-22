@@ -63,13 +63,43 @@ meta def instantiate_mvars : rule_app → tactic rule_app
   pf ← tactic.instantiate_mvars pf,
   pure $ {r:=r,lhs:=lhs,rhs:=rhs,adr:=adr,pf:=pf} 
 
+meta def rule_rewrite : rule → zipper → tactic rule_app := λ r lhs, do
+    T ← tactic.infer_type lhs.current,
+    -- tactic.infer_type r.pf >>= tactic.trace_m "rule_rewrite: ",
+    rhs ← tactic.mk_meta_var T,
+    target ← tactic.mk_app `eq [lhs.current,rhs],
+    pf ← tactic.fabricate target (do
+        /- [FIXME] apply_core is the performance bottleneck.
+           one idea to resolve this is to make a pattern for each rule and hope that `match_pattern` is faster. -/
+        --timetac "apply_core" $
+        /- [BUG] this fails when it shouldn't on matching eg `X (Y * Z)` -/
+        tactic.apply_core r.pf {md := transparency.none, unify := tt},
+        all_goals $ try $ apply_instance <|> prop_assumption,
+        pure ()
+    ),
+    (rhs',pf') ← zipper.apply_congr (rhs,pf) lhs,
+    let ra : rule_app :=
+        { r := r
+        , lhs := lhs.unzip
+        , rhs := rhs'
+        , adr := zipper.address lhs
+        , pf := pf'
+        },
+    ra ← instantiate_mvars ra,
+    pure ra
+
+
+
 meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
   T ← tactic.infer_type lhs.current,
   rhs ← tactic.mk_meta_var T,
   target ← tactic.mk_app `eq [lhs.current,rhs],
   pf ← tactic.fabricate target (do
-    -- [FIXME] `apply_core` is the performance bottleneck.
-    --timetac "apply_core" $ 
+    -- [FIXME] `unify` is the performance bottleneck.
+    -- timetac "unify" $ 
+    --tactic.unify r.lhs lhs.current transparency.none tt,
+    -- timetac "apply_core" $
+    --trace_state,
     tactic.apply_core r.pf {md := transparency.none, unify := tt},
     all_goals $ try (apply_instance <|> prop_assumption),
     pure ()
@@ -103,12 +133,12 @@ meta def rewrite_conv : rule_app → conv unit := λ r, do
         lhs ← conv.lhs >>= tactic.instantiate_mvars,
         sub ← tactic.instantiate_mvars r.lhs,
         l ← ez.zipper.find_occurences (zipper.zip lhs) r.lhs,
-        -- trace_m "rewrite_conv: " $ (lhs,r, l),
         (z::rest) ← pure l,
+        tactic.trace_m "rewrite_conv: " $ r.pf,
         r ← head_rewrite r z,
         transitivity,
         apply r.pf,
-        --trace_state, trace r,
+        -- trace_state, trace r,
         try $ all_goals $ apply_instance <|> prop_assumption,
         pure ()
 
