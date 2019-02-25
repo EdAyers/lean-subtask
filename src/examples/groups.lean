@@ -8,6 +8,8 @@ section additive_groups
     variables {α : Type u} [add_comm_group α] {u v w x y z : α}
     example : (x + y) + z = (z + x) + y := 
     by equate
+    example : x + y + z = z + x + y := 
+    by equate
     example : x + (y - z) = -z + y + x := 
     by equate
     example : x - (y + z) = x - y - z := 
@@ -30,6 +32,58 @@ section additive_groups
     #print X2
 end additive_groups
 
+section powers
+    variables {M : Type u} [monoid M] {a : M} {n m : ℕ}
+    @[equate] lemma my_pow_mul_comm' : a^n * a = a * a^n :=
+    begin
+        induction n,
+        simp,
+        equate
+    end
+    @[equate] lemma my_pow_succ' : a^(n+1) = a^n * a :=
+    by equate
+    @[equate] lemma my_pow_1 : a^1 = a := by equate
+    @[equate] lemma my_pow_2 : a^2 = a * a := by equate
+    @[equate] lemma my_pow_add : a^(m + n) = a^m * a^n :=
+    begin
+        induction m, 
+        simp,
+        equate
+    end
+    @[equate] lemma my_one_pow : (1:M)^n = (1:M) :=
+    begin
+        induction n,
+        simp, equate
+    end
+    @[equate] lemma my_pow_mul : (a^n)^m = a^(n * m) := 
+    begin
+        induction m, 
+        simp,
+        equate
+    end
+    @[equate] lemma my_pow_mul_comm : (a^n) * (a^m) = (a^m) * (a^n)
+    := by equate
+end powers
+
+section comm_monoid_powers
+    variables {M:Type u} [comm_monoid M] {a b c : M} {n m : ℕ}
+    @[equate] lemma my_mul_pow : (a * b)^n = a^n * b^n
+    := begin
+        induction n,
+        simp,
+        equate
+    end
+end comm_monoid_powers
+
+section group_powers
+    variables {G : Type u} [group G] {a b c : G} {n m : ℕ}
+    @[equate] lemma my_inv_pow : (a⁻¹)^n = (a^n)⁻¹ :=
+    begin
+        induction n,
+        simp,
+        equate
+    end 
+end group_powers
 
 -- set_option pp.numerals false
 -- [FIXME] The least_absent_subterm module has to be able to count previous times that a given subterm is used.

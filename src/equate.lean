@@ -36,6 +36,10 @@ attribute [equate] mul_one
 attribute [equate] inv_inv
 @[equate] lemma mul_inv {G:Type*} [group G] {a b : G} : (a * b) ⁻¹ = b⁻¹ * a⁻¹ := by simp 
 
+attribute [equate] pow_succ
+attribute [equate] pow_zero
+@[equate] lemma nat_succ_is_nat_plus_one {n} : nat.succ n = n + 1 := rfl
+
 attribute [equate] add_assoc
 attribute [equate] add_left_neg
 attribute [equate] add_right_neg
@@ -44,6 +48,8 @@ attribute [equate] add_zero
 attribute [equate] add_comm
 attribute [equate] neg_add
 attribute [equate] neg_neg
+
+@[equate] lemma one_plus_one_is_two : 1 + 1 = 2 := rfl
 
 attribute [equate] sub_self
 attribute [equate] sub_eq_add_neg

@@ -64,7 +64,10 @@ meta def tactic.fabricate (type : option expr) (strat : tactic unit) : tactic ex
     set_goals [new_g],
     strat,
     n ← num_goals,
-    when (n≠0) (fail "fabrication failed: there are unsolved goals."),
+    when (n≠0) (do
+        st ← read,
+        ppst ← pp st,
+        fail $ (to_fmt "fabrication failed, there are unsolved goals:\n") ++ ppst),
     set_goals gs,
     instantiate_mvars new_g
 

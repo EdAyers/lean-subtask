@@ -99,7 +99,6 @@ meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
     -- timetac "unify" $ 
     --tactic.unify r.lhs lhs.current transparency.none tt,
     -- timetac "apply_core" $
-    --trace_state,
     tactic.apply_core r.pf {md := transparency.none, unify := tt},
     all_goals $ try (apply_instance <|> prop_assumption),
     pure ()
@@ -134,8 +133,8 @@ meta def rewrite_conv : rule_app → conv unit := λ r, do
         sub ← tactic.instantiate_mvars r.lhs,
         l ← ez.zipper.find_occurences (zipper.zip lhs) r.lhs,
         (z::rest) ← pure l,
-        tactic.trace_m "rewrite_conv: " $ r.pf,
-        r ← head_rewrite r z,
+        r ← tactic.trace_fail $ head_rewrite r z,
+        -- tactic.trace_m "rewrite_conv: " $ r,
         transitivity,
         apply r.pf,
         -- trace_state, trace r,

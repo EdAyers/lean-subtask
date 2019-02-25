@@ -257,6 +257,7 @@ namespace zipper
     meta def unzip_free : zipper → expr := λ z, z.unzip_with $ expr.var z.binder_depth
     /-- `apply_congr (rhs,pf) z` takes the given `%%pf : %%z.current = %%rhs` and makes a congruence lemma using the given zipper.  -/
     meta def apply_congr : (expr × expr) → zipper → tactic (expr × expr) := λ ⟨rhs,pf⟩ z, do
+        if z.is_top then pure ⟨rhs,pf⟩ else do
         let lhs := z.current,
         T ← tactic.infer_type lhs,
         let lhs' := z.unzip,
@@ -266,8 +267,9 @@ namespace zipper
         motive ← to_expr $ @expr.lam ff `X binder_info.default (to_pexpr T) $ ```(%%lhs' = %%(z.unzip_with $ expr.var z.binder_depth)),
         -- pp motive >>= λ m, trace $ ("motive: ":format) ++ m,
         pf' ← tactic.fabricate (some target) (do
+            -- trace_state,
             refine ```(@eq.rec %%T %%lhs %%motive rfl %%rhs %%pf),
-            all_goals $ try $ (apply_instance <|> prop_assumption)
+            all_goals $ try $ (apply_instance <|> assumption)
         ),
         pure (rhs',pf')
     
@@ -343,17 +345,18 @@ namespace zipper
         `p` doesn't fail. 
         [NOTE] It assumes that if `p e` fails, then all of `e`s subexpressions will fail too. -/
     meta def maximal_monotone {α} (p : zipper → tactic α) : zipper → tactic (list α)
-    |z := (do a ← p z, pure [a]) <|> do
+    |z := (do a ← p z,  pure [a]) <|> do
             (f,children) ← down_proper z,
             children ← pure $ if is_local_constant f && ¬children.empty then f :: children else children,
             kids ← list.join <$> list.mmap maximal_monotone children,
             pure $ kids
     /-- `find_occurences z e` finds subexpressions of `z` which non-trivially unify with `e`. -/
-    meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e,
-        maximal_monotone (λ z,
+    meta def find_occurences : zipper → expr → tactic (list zipper) := λ E e, do
+        rs ← maximal_monotone (λ z,
             if z.is_mvar || z.is_constant then failure
             else tactic.hypothetically' (unify e z.current transparency.none) *> pure z
-        ) E
+        ) E,
+        pure rs
 
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e

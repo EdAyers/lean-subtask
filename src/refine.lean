@@ -28,10 +28,10 @@ meta def task.test : expr → task → M bool
 |ce (task.Create n e) := do
     e ← instantiate_mvars e,
     pp_ce ← pp ce, pp_e ← pp e,
-    --trace_m "task.test: " $ (to_fmt "testing that " ++ pp_ce ++ " satisfies Create " ++ pp_e),
+    -- trace_m "task.test: " $ (to_fmt "testing that " ++ pp_ce ++ " satisfies Create " ++ pp_e),
     matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e,
+    -- trace_m "task.test: " $ matches,
     pure $ matches.length ≥ n
-    --trace_m "task.test: " $ matches,
     -- pure $ bnot matches.empty
 |ce t@(task.CreateAll e) :=
     -- trace_m "task.test: " $ t,
@@ -225,7 +225,7 @@ meta def strategy.execute : strategy → M unit
         h ← get_distance_reducer a b,
         run_conv $ rule_app.rewrite_conv h
     )
-|s@(strategy.Use r)            := 
+|s@(strategy.Use r)            := do
     run_conv $ rule_app.rewrite_conv r
 
 meta def strategy.refine : strategy → M refinement
