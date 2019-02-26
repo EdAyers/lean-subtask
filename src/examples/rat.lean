@@ -2,6 +2,12 @@ import ..equate
 namespace rats
 open robot
 
+meta def blast : tactic unit :=
+tactic.timetac "blast" $ (using_smt_with {cc_cfg := {ac:=ff}} $ tactic.intros >> smt_tactic.iterate (smt_tactic.ematch >> smt_tactic.try smt_tactic.close))
+attribute [ematch] mul_comm mul_assoc
+
+
+
 universes u
 structure q (α : Type u) [integral_domain α] := (n : α) (d : α ) (nz : d ≠ 0)
 lemma q.ext {α : Type u} [integral_domain α] : Π (q1 q2 : q α), q1.n = q2.n → q1.d = q2.d → q1 = q2
@@ -18,7 +24,8 @@ instance (α : Type u) [integral_domain α] : setoid (q α) :=
     --  suffices a * f = e * b, from this,
     --  by equate
     suffices d * (a * f) = d * (e * b), from eq_of_mul_eq_mul_left h this,
-    by equate
+    -- by blast -- 2200ms
+    by equate -- 1500ms
   ⟩
 }
 def free (α : Type u) [integral_domain α] : Type* := @quotient (q α) (by apply_instance)

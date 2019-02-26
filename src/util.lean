@@ -148,6 +148,8 @@ meta def expr.is_sort : expr → bool
 |(expr.sort _) := tt
 |_ := ff
 
+meta def expr.size : expr → nat := λ e, expr.fold e 0 (λ e bd n, n+1)
+
 meta def expr.is_term (e : expr) : tactic bool := do
     T ← infer_type e,
     iscl ← tactic.is_class T,

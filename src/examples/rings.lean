@@ -16,22 +16,32 @@ section rings
     by equate
     lemma sumsq_2 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by ring
+
+    meta def trace_proof_size : name → tactic unit := λ n, (do
+        env ← tactic.get_env,
+        declaration.thm n e y p ← environment.get env n,
+        p ← pure $ task.get $ p,
+        tactic.trace $ expr.size p
+    )
+    run_cmd (trace_proof_size `sumsq_1)
+    run_cmd (trace_proof_size `sumsq_2)
+    
     #print sumsq_1
     #print sumsq_2
     -- example : (a + b) * (a - b) = a * a - b * b := 
     -- by equate
-    example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
-    by equate
     example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
     by equate 
     example : a * b + b * c = (a + c) * b := 
     by equate
     example : (a + c) * b = a * b + b * c := 
     by equate
+    example : (a + c) * b = a * b + b * c := 
+    by ring
 
     /- In ideals.lean -- `(I : ideal α) : has_mul I.quotient` -/
     example : (a * b - c * d) = b * a - b * c + (b * c - d * c) :=
-    by equate
+    by ring
 
 
     /- In multiplicity.lean , `finite_mul_aux`. -/
@@ -41,10 +51,8 @@ section rings
     :   p * (x * b) = p * (p ^ (n - 1 + m + 1) * s) 
     := by equate
 
-    /- Failures: -/
-
     example : (a + b) * (a - b) = a * a - b * b := 
-    by equate
+    by ring
     example : (a * b) - c + (b * a) = - c + 2 * (a *  b) := 
     by equate  
     example : (a * b) - c + (b * a) = - c + (2 * a) *  b := 
@@ -55,8 +63,10 @@ section rings
     /- Comparison of proof lengths. -/
     lemma e1 : (x+y)^2+(x+z)^2 = (z+x)^2+(y+x)^2 := by equate
     #print e1
+    run_cmd trace_proof_size `e1
     lemma e2 : (x+y)^2+(x+z)^2 = (z+x)^2+(y+x)^2 :=
          by ring
     #print e2
+    run_cmd trace_proof_size `e2
 
 end rings

@@ -85,9 +85,6 @@ section group_powers
     end 
 end group_powers
 
--- set_option pp.numerals false
--- [FIXME] The least_absent_subterm module has to be able to count previous times that a given subterm is used.
-
 section group_homs1
     variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y z h : G}
     example : (x * z) * (z⁻¹ * y) = x * y
