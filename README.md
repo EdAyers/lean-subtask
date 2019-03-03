@@ -1,23 +1,14 @@
-## Human-oriented term rewiting.
+# Human-oriented Term Rewriting.
 
-__Subtask__ is a new approach to proof planning developed by Edward Ayers, Tim Gowers and Mateja Jamnik at the University of Cambridge.
-
-# Summary of algorithm
-
-We maintain a DAG of _tasks_ and _strategies_ called the __task graph__.
-We maintain a list of _strategies_ called the __front__.
-
-We update the state by doing one of two things:
-Find a 
+A prototype implementation of the subtasks algorithm in Lean for solving simple equalities.
 
 
+## Build & Run
 
-# [TODO] 
+This code runs using Lean 3.4.2.
 
-- [ ] generate lookahead from all equality lemmas tagged with -- eg `@[subgoal]` or perhaps just all lemmas
-- [ ] write refiners for tasks and strategies
-    + [ ] find smallest uncommon subterms
-    + [ ] write code to traverse 'proper terms' which are expressions that are not types/instances and not partially applied terms.
-- [ ] bring over the graph code
-- [ ] write some code that finds all possible state updates.
-- [ ] measure the 'entropy' of a state. 
+1. Install [Lean](https://github.com/leanprover/lean). [TODO] provide more guidance on this.
+2. It is recommended that you view the examples files within the supported editors: vscode or emacs. 
+3. Open this directory and run `leanpkg build`. This will pull and verify mathlib and will take about 20 mins.
+4. Open any file from the examples folder and inspect Lean Messages to see the `equate` tactic in action
+

@@ -8,8 +8,8 @@ section foldable
     (fold : ∀ {α σ : Type u}, (α → σ → σ) → σ → F α → σ)
 end foldable
 
--- [TODO] make sure the argument order conventions in this file are not pointlessly different to commonly used ones.
-/-- Lightweight wrapper around `rbtree` because I keep swapping out which dictionary implementation I am using -/
+/-- Lightweight wrapper around `rbtree` because I keep swapping out 
+  which dictionary implementation I am using. -/
 meta def table (α : Type) : Type := rb_set α
 meta def dict (k : Type) (α : Type) : Type := rb_map k α
 infixl ` ⇀ `:1 := dict
@@ -53,11 +53,18 @@ namespace table
             pure $ to_fmt "{" ++ (format.group $ format.nest 1 $ format.join $ list.intersperse ("," ++ format.line) $ items ) ++ "}"⟩
     meta def are_equal [decidable_eq α] : table α → table α → bool := (λ l₁ l₂, l₁ = l₂) on (to_list)
     -- meta instance [decidable_eq α] {t₁ t₂ : table α} : decidable (t₁ = t₂) := dite (are_equal t₁ t₂) (is_true) (is_false)
-    /-- A total ordering on tables. -/
-    meta def compare : table α → table α → Prop := λ t₁ t₂, to_list t₁ < to_list t₂
+    /-- A total ordering on tables. [TODO] make more efficient. -/
+    @[reducible] meta def compare : table α → table α → Prop := λ t₁ t₂, to_list t₁ < to_list t₂
     meta def size : table α → ℕ := rb_set.size
     meta instance : has_lt (table α) := ⟨compare⟩
-    meta instance : decidable_rel ((<) : table α → table α → Prop) := λ t₁ t₂, list.has_decidable_lt (to_list t₁) (to_list t₂)
+        #check list.has_lt'
+    meta instance [decidable_eq α] : decidable_rel ((<) : table α → table α → Prop) 
+    | t₁ t₂ := 
+        -- show decidable (compare t₁ t₂), from
+        -- show decidable (to_list t₁ < to_list t₂), from
+        show decidable (list.lex (<) (to_list t₁) (to_list t₂)), from
+        list.lex.decidable_rel _ _ _
+        -- list.lex.decidable_rel _ _
 end table
 
 namespace dict
@@ -136,7 +143,7 @@ namespace tabledict
     meta instance [has_to_tactic_format κ] [has_to_tactic_format α] : has_to_tactic_format (tabledict κ α) := ⟨λ (d : dict κ (table α)), tactic.pp d⟩
     meta def fold {β} (f : β → κ → α → β) : β → tabledict κ α → β := dict.fold (λ b k, table.fold (λ b, f b k) b)
     meta def mfold {T} [monad T] {β} (f : β → κ → α → T β) : β → tabledict κ α → T β := dict.mfold (λ b k, table.mfold (λ b, f b k) b)
-    meta def to_list : tabledict κ α → list α := robot.list.collect (table.to_list ∘ prod.snd) ∘ dict.to_list
+    meta def to_list : tabledict κ α → list α := list.collect (table.to_list ∘ prod.snd) ∘ dict.to_list
 end tabledict
 
 meta def listdict (κ : Type) (α : Type) [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] : Type := dict κ (list α)

@@ -10,7 +10,7 @@ meta inductive task : Type
 /- passes when we remove the given term from the CE. 
 Generally this is only used when a variable appears in the CE but not 
 in the target and there are no rules explicitly removing the variable. -/
-|Destroy : ez.zipper → task
+|Destroy : expr.zipper → task
 |Merge : expr → task
 namespace task
     protected meta def code : task → ℕ

@@ -1,6 +1,8 @@
 import .util
 namespace robot
 universes u
+
+/-- A `tree α` is either a `leaf` of `α` or a `branch` of `α` and `list (tree α)`.  -/
 inductive tree (α : Type u)
 |branch (a : α) (children : list tree) : tree
 |leaf (a : α) : tree
@@ -21,15 +23,17 @@ meta def map (f : α → β) : tree α → tree β
 |(leaf a) := leaf $ f $ a
 |(branch a c) := branch (f a) $ list.map map c
 
-instance : has_pure tree := ⟨λ α a, leaf a⟩
+instance : has_pure tree := ⟨λ α, leaf⟩
 
 meta instance : functor tree := {map := λ α β f t, map f t}
+
 def set_children : list (tree α) → tree α → tree α |c t := branch (head_item t) c
 
 inductive zipper.path (α : Type u)
 |top : zipper.path
 |down : α → ℕ → list (tree α) → zipper.path → zipper.path
 
+/-- A zipper on trees. -/
 structure zipper (α : Type u) :=
 (p : zipper.path α)
 (current : tree α)

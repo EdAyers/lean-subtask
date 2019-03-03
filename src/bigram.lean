@@ -1,4 +1,4 @@
-import .rule .zipper .rule_table
+import .rule .expr_zipper .rule_table
 
 namespace robot
 --open ez ez.zipper
@@ -51,12 +51,12 @@ namespace bigram
 def tolerance := 2
 def generality := 5
 def max_trigger_depth := 10
-open ez ez.zipper
+open expr expr.zipper
 
 private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic (mtable bigram)
 |t acc z := do
     (b,children) ← down_proper z,
-    match expr.const_name $ zipper.current $ b with
+    match expr.as_name $ zipper.current $ b with
     |(some n) :=
         let acc := acc.insert ⟨t,n⟩ in
         children.mfoldl (get_bigrams_aux n) acc
@@ -65,7 +65,7 @@ private meta def get_bigrams_aux : name → mtable bigram → zipper → tactic 
 
 meta def get_bigrams : expr → tactic (mtable bigram) := λ e, do
     (t,children) ← down_proper $ zip $ e,
-    match expr.const_name $ zipper.current $ t with
+    match expr.as_name $ zipper.current $ t with
     |(some t) := do 
         bgs ← children.mfoldl (get_bigrams_aux t) ∅,
         pure $ if bgs.is_empty then {bigram.mk t name.anonymous} else bgs

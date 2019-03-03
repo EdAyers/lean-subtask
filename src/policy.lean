@@ -1,11 +1,10 @@
-import .M .zipper .refine
-open ez tactic
+import .M .refine
+open expr tactic expr.zipper
 namespace robot
 
 meta def is_term : expr → tactic bool := λ e, do
-    T ← infer_type e >>= instantiate_mvars,
+    T ← tactic.infer_type e >>= instantiate_mvars,
     pure $ expr.is_sort T
-open ez.zipper
 
 def weak : ℕ := 1
 def medium : ℕ := 2

@@ -1,7 +1,6 @@
 /- Expression zipper -/
 import .util .rule
-namespace ez
-open robot
+namespace expr
 
 /-- Labels for each recursive argument of a constructor for `expr`. -/
 @[derive decidable_eq]
@@ -76,7 +75,7 @@ meta def path.to_src : path → option src
 |(path.elet_body n y a b) := some $ src.Assigned n y a
 |_ := none
 
-meta def path.to_context : list path → list src := list.choose path.to_src
+meta def path.to_context : list path → list src := list.filter_map path.to_src
 
 namespace src
     meta def type : src → expr
@@ -214,8 +213,8 @@ namespace zipper
     meta def is_var : zipper → bool := expr.is_var ∘ current
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
     /--True when the current expression does not contain local constants -/
-    meta def no_local_consts : zipper → bool := list.empty ∘ list_local_consts ∘ current 
-    meta def no_local_const_terms : zipper → tactic bool := λ z, list.empty <$> (list_local_const_terms $ current $ z)
+    meta def no_local_consts : zipper → bool := list.empty ∘ expr.list_local_consts ∘ current 
+    meta def no_local_const_terms : zipper → tactic bool := λ z, list.empty <$> (expr.list_local_const_terms $ current $ z)
     meta def is_local_constant : zipper → bool := expr.is_local_constant ∘ current
     meta def is_mvar : zipper → bool := expr.is_mvar ∘ current
     meta def is_terminal : zipper → bool := λ z, z.down = down_result.terminal
@@ -296,7 +295,7 @@ namespace zipper
     meta def down_proper (z : zipper) : tactic (zipper × list zipper) := do
         let c := z.current,
         let f := expr.get_app_fn c,
-        let f_name := expr.const_name f,
+        let f_name := expr.as_name f,
         -- if it is a numeral then don't expand it.
         if f_name = `bit0 ∨ f_name = `bit1 then pure (z,[]) else do
         let args := expr.get_app_args c,
@@ -361,12 +360,14 @@ namespace zipper
     meta def has_occurences : zipper → expr → tactic bool 
     := λ z e, (bnot ∘ list.empty) <$> find_occurences z e
 
-    meta def smallest_absent_subterms_aux (l : expr) (filter : zipper → tactic bool := combinator.K $ pure tt) : list ez.address  → zipper → tactic (list ez.address × list (ℕ × zipper))
+    meta def smallest_absent_subterms_aux (l : expr) 
+        (filter : zipper → tactic bool := combinator.K $ pure tt) 
+        : list expr.address  → zipper → tactic (list expr.address × list (ℕ × zipper))
     |used z := do
         filt ← filter z, 
         if ¬ filt then pure (used, []) else do
         occs ← find_occurences l z.current,
-        o ← pure $ list.first (λ o, bnot $ list.any used $ λ x, zipper.address o ≺ x) occs,
+        o ← pure $ list.find (λ o, bnot $ list.any used $ λ x, zipper.address o ≺ x) occs,
         match o with
         |none := do -- z.current is not present, descend.
             (_,children) ← down_proper z,
@@ -536,4 +537,4 @@ namespace zipper
 
 end zipper
 
-end ez
+end expr

@@ -1,6 +1,6 @@
-import .M .zipper
+import .M
 namespace robot
-open strategy task tactic robot.tactic ez
+open strategy task tactic expr
 meta def strategy.merge : strategy → strategy → M strategy 
 |(Use r₁) (Use r₂) := do
     r ← hypothetically' (do 
@@ -13,8 +13,7 @@ meta def strategy.merge : strategy → strategy → M strategy
 
 meta def destroy_test : zipper → expr → M bool
 |e c := 
-    (do 
-        cez ← zipper.down_address e.address c,
+    (do cez ← zipper.down_address e.address c,
         eq_above ← zipper.above_equal cez e,
         guard (eq_above),
         e_locals ← list_local_const_terms e.current,
@@ -22,14 +21,14 @@ meta def destroy_test : zipper → expr → M bool
         pure $ e_locals.any (∉ cez_locals)
     )
     <|>
-    (hypothetically' (ez.zipper.find_subterm e.current c *> pure ff)) <|> pure tt
+    (hypothetically' (zipper.find_subterm e.current c *> pure ff)) <|> pure tt
 
 meta def task.test : expr → task → M bool
 |ce (task.Create n e) := do
     e ← instantiate_mvars e,
     pp_ce ← pp ce, pp_e ← pp e,
     -- trace_m "task.test: " $ (to_fmt "testing that " ++ pp_ce ++ " satisfies Create " ++ pp_e),
-    matches : list ez.zipper ← ez.zipper.find_occurences (ez.zipper.zip ce) e,
+    matches : list zipper ← zipper.find_occurences (zipper.zip ce) e,
     -- trace_m "task.test: " $ matches,
     pure $ matches.length ≥ n
     -- pure $ bnot matches.empty
@@ -37,7 +36,7 @@ meta def task.test : expr → task → M bool
     -- trace_m "task.test: " $ t,
     (hypothetically' (unify e ce *> pure tt)) <|> pure ff
 |ce t@(task.Annihilate x) :=
-    (ez.zipper.find_subterm x ce *> pure ff) <|> pure tt
+    (zipper.find_subterm x ce *> pure ff) <|> pure tt
 |ce t@(task.Destroy e) := do
     destroy_test e ce
 |ce t := notimpl
@@ -77,7 +76,6 @@ meta def try_dioms : task → M refinement | t := do
     -- trace dioms,
     if ¬ dioms.empty then pure ([],dioms) else failure
 
-open ez tactic
 meta def get_distance_reducer : expr → expr → M (rule_app)
 | a b := do
     a ← instantiate_mvars a, 
@@ -196,7 +194,7 @@ match t with
     some xu ← pure $ zipper.up x | pure ∅,
     submatches ← rt.submatch_lhs x.current,
     submatches ← list.mmap (λ r, rule_app.flip r) submatches,
-    ⟨breakups,rewrites⟩ ← list.mpartition (λ r, 
+    ⟨breakups,rewrites⟩ ← list.msplit (λ r, 
         (do z ← zipper.find_non_unify_subterm x.current (rule_app.lhs r),
             guard (¬ z.is_top),
             pure $ sum.inl r
@@ -243,6 +241,5 @@ meta def strategy.refine : strategy → M refinement
     -- ) $ zipper.zip $ r.lhs,
     subs ← scs.mmap (λ z, task.Create z.1 <$> instantiate_mvars z.2.current),
     pure ⟨subs, []⟩
-
 
 end robot

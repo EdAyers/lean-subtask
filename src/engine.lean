@@ -1,6 +1,6 @@
 import .refine
 namespace robot
-open tree.zipper tactic robot.tactic
+open tree.zipper tactic
 
 /-- Backtracking state. -/
 meta structure memento :=
@@ -96,8 +96,8 @@ match estate.mode with
     -- add these as children to the zipper.
     z ← pure $ z.grow $ (subtasks.map tree_entry.of_task) ++ (substrats.map tree_entry.of_strat),
     -- extract the child zippers.
-    actions : list action      ← pure $ list.choose (λ z, (λ s, (s,z)) <$> (as_strat $ item z)) $ tree.zipper.down_all $ z,
-    subtasks : list (task × Z) ← pure $ list.choose (λ z, (λ s, (s,z)) <$> (as_task  $ item z)) $ tree.zipper.down_all $ z,
+    actions : list action      ← pure $ list.filter_map (λ z, (λ s, (s,z)) <$> (as_strat $ item z)) $ tree.zipper.down_all $ z,
+    subtasks : list (task × Z) ← pure $ list.filter_map (λ z, (λ s, (s,z)) <$> (as_task  $ item z)) $ tree.zipper.down_all $ z,
         candidates ← π.evaluate actions | failure,
         overall_score ← π.get_overall_score candidates,
     ( do
@@ -232,7 +232,7 @@ meta def run_aux (π : policy) : ℕ → engine_state → M engine_state
 /--Add all of the rules which appear in the local context. -/
 meta def add_hyp_rules (rt : rule_table) : tactic rule_table :=
     local_context >>= list.mfoldl (λ rt r, (do 
-        n ← expr.const_name r | failure,
+        n ← expr.as_name r | failure,
         r ← rule.of_prf n r, 
         rev ← rule.flip r, 
         pure rt >>= rule_table.insert r >>= rule_table.insert rev

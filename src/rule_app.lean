@@ -1,6 +1,6 @@
-import .util .table .zipper
+import .util .table .expr_zipper
 namespace robot
-open tactic robot ez
+open tactic robot expr
 
 -- @[derive decidable_eq]
 -- meta structure rule2 :=
@@ -131,7 +131,7 @@ meta def head_rewrite_conv : rule_app → conv unit := λ r, do
 meta def rewrite_conv : rule_app → conv unit := λ r, do
         lhs ← conv.lhs >>= tactic.instantiate_mvars,
         sub ← tactic.instantiate_mvars r.lhs,
-        l ← ez.zipper.find_occurences (zipper.zip lhs) r.lhs,
+        l ← zipper.find_occurences (zipper.zip lhs) r.lhs,
         (z::rest) ← pure l,
         r ← tactic.trace_fail $ head_rewrite r z,
         -- tactic.trace_m "rewrite_conv: " $ r,
@@ -161,7 +161,6 @@ meta def flip (ra : rule_app) : tactic rule_app := do
     adr := ra.adr,
     pf := pf
   }
-
 
 end rule_app
 

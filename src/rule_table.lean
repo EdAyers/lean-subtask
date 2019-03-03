@@ -1,36 +1,17 @@
 
-import .table .rule_app .zipper
-open tactic ez
+import .table .rule_app .expr_zipper
+open tactic expr
 namespace robot
 
+/-- A __submatch__ is a rule `r` and a zipper on `r.lhs`. 
+They represent fragments of the LHS to match against some given term. -/
 @[derive decidable_eq]
 meta structure submatch :=
 (r : rule) -- the original rule
-(z : zipper) -- a zipper on `r.rhs`
+(z : expr.zipper) -- a zipper on `r.rhs`
 
 namespace submatch
     open tactic
-    -- meta def intro_metas : list expr → list hyp → tactic (list expr)
-    -- |acc (⟨n,b,y⟩::rest) := do 
-    --     let y := expr.instantiate_vars y acc,
-    --     mv ← tactic.mk_meta_var y,
-    --     intro_metas (mv::acc) rest
-    -- |acc [] := pure acc
-    -- meta def run : expr → submatch → tactic rule | e ⟨r,z⟩ := do -- [TODO] return a `submatch_result` which also scores the match.
-    --     gs ← get_goals,
-    --     e_type ← infer_type e,
-    --     ms ← intro_metas [] $ r.ctxt.reverse,
-    --     set_goals ms,
-    --     let current := expr.instantiate_vars z.current ms,
-    --     current_type ← infer_type current,
-    --     unify current_type e_type,
-    --     all_goals $ try $ apply_instance,
-    --     current ← instantiate_mvars current,
-    --     unify e current,
-    --     --ctxt : list $ hyp × expr × option expr ← list.zip r.ctxt <$> list.mmap (λ h, (some <$> get_assignment h) <|> pure none) ms,
-    --     ms ← ms.mmap instantiate_mvars,
-    --     set_goals gs,
-    --     rule.of_prf $ expr.mk_app r.pf ms.reverse
 
     /-- [HACK] run_app does the same thing as `run` except that sometimes the unifier doesn't try to unify the function and argument separately. -/
     meta def run_app : expr → submatch → tactic rule_app
@@ -73,6 +54,7 @@ namespace submatch
         let current := expr.instantiate_vars z.current $ ms.reverse,
         current ← instantiate_mvars current,
         -- tactic.trace_m "submatch.run: " $ current,
+        -- [FIXME] duplicate code with `run_app`. 
         tactic.hypothetically' (do 
             unify current e, -- [HACK] for some reason this can't unify `A ?m_1` and `?m_2 ?m_3`? Current fix is `run_app`.
             --trace_state,
