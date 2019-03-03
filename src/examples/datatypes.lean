@@ -32,3 +32,36 @@ section
         equate 
     end
 end
+
+namespace my_nat
+    inductive my_nat : Type
+    |zero : my_nat
+    |succ : my_nat → my_nat
+    open my_nat
+    instance : has_zero my_nat := ⟨my_nat.zero⟩
+    variables {x y z : my_nat}
+    def add : my_nat → my_nat → my_nat
+    |(my_nat.zero) x := x
+    |(my_nat.succ x) y := my_nat.succ (add x y)
+    instance : has_add my_nat := ⟨add⟩
+    local notation `s(` x `)` := my_nat.succ x
+    @[equate] lemma add_zero : 0 + x = x := rfl
+    @[equate] lemma add_succ : (s(x)) + y = s(x + y) := rfl
+    @[equate] lemma nat_assoc {x y z : my_nat} :  x + ( y + z ) = (x + y) + z :=
+    begin
+        induction x,
+        equate,
+        equate
+    end
+    @[equate] lemma succ_add : y + (s(x)) = s(y + x) := begin
+        induction y, equate, equate
+    end
+    @[equate] lemma zero_add : x + my_nat.zero = x := begin 
+        induction x, equate, equate
+    end
+    @[equate] lemma add_comm : x + y = y + x := begin
+        induction x, 
+        rw zero_add, refl, 
+        equate
+    end
+end my_nat

@@ -34,10 +34,8 @@ section rings
     by equate 
     example : a * b + b * c = (a + c) * b := 
     by equate
-    example : (a + c) * b = a * b + b * c := 
-    by equate
-    example : (a + c) * b = a * b + b * c := 
-    by ring
+    example : (a + c) * b = c * b + b * a := by equate
+    example : (a + c) * b = c * b + b * a := by ring
 
     /- In ideals.lean -- `(I : ideal α) : has_mul I.quotient` -/
     example : (a * b - c * d) = b * a - b * c + (b * c - d * c) :=
@@ -45,14 +43,14 @@ section rings
 
 
     /- In multiplicity.lean , `finite_mul_aux`. -/
-    example {a b p s x : α} {n m : ℕ } 
-        (h₁ : a = p * x) 
-        (h₂ : a * b = p ^ (n + m + 1) * s)
-    :   p * (x * b) = p * (p ^ (n - 1 + m + 1) * s) 
-    := by equate
+    -- example {a b p s x : α} {n m : ℕ } 
+    --     (h₁ : a = p * x) 
+    --     (h₂ : a * b = p ^ (n + m + 1) * s)
+    -- :   p * (x * b) = p * (p ^ (n - 1 + m + 1) * s) 
+    -- := by equate
 
     example : (a + b) * (a - b) = a * a - b * b := 
-    by ring
+    by equate
     example : (a * b) - c + (b * a) = - c + 2 * (a *  b) := 
     by equate  
     example : (a * b) - c + (b * a) = - c + (2 * a) *  b := 
@@ -61,10 +59,10 @@ section rings
     by equate  
 
     /- Comparison of proof lengths. -/
-    lemma e1 : (x+y)^2+(x+z)^2 = (z+x)^2+(y+x)^2 := by equate
+    lemma e1 : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 := by equate
     #print e1
     run_cmd trace_proof_size `e1
-    lemma e2 : (x+y)^2+(x+z)^2 = (z+x)^2+(y+x)^2 :=
+    lemma e2 : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 :=
          by ring
     #print e2
     run_cmd trace_proof_size `e2

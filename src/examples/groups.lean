@@ -19,6 +19,14 @@ section additive_groups
     example : - (x - y) = y - x := 
     by equate
     example : (x - y) = -(y - x) := 
+    -- [TODO] do this with a kind of top-down create.
+    by equate
+    example : (x - y) = -(y + - x) := 
+    -- [TODO] do this with a kind of top-down create.
+    by equate
+    example : (- - x) + - y = -(y - x) := 
+    by equate
+    example : (- - x) - y = -(y - x) := 
     by equate
     example : (x + y) + (z + w) = (x + z) + (y + w) := 
     by equate
@@ -34,14 +42,16 @@ end additive_groups
 
 section powers
     variables {M : Type u} [monoid M] {a : M} {n m : ℕ}
+
     @[equate] lemma my_pow_mul_comm' : a^n * a = a * a^n :=
     begin
         induction n,
         simp,
         equate
     end
-    @[equate] lemma my_pow_succ' : a^(n+1) = a^n * a :=
+    @[equate] lemma my_pow_succ' : a^(nat.succ n) = a^n * a :=
     by equate
+    -- set_option pp.notation false
     @[equate] lemma my_pow_1 : a^1 = a := by equate
     @[equate] lemma my_pow_2 : a^2 = a * a := by equate
     @[equate] lemma my_pow_add : a^(m + n) = a^m * a^n :=
@@ -53,12 +63,13 @@ section powers
     @[equate] lemma my_one_pow : (1:M)^n = (1:M) :=
     begin
         induction n,
-        simp, equate
+        equate, 
+        equate
     end
     @[equate] lemma my_pow_mul : (a^n)^m = a^(n * m) := 
     begin
         induction m, 
-        simp,
+        equate,
         equate
     end
     @[equate] lemma my_pow_mul_comm : (a^n) * (a^m) = (a^m) * (a^n)
@@ -91,11 +102,17 @@ section group_homs1
     := by equate
     example : x * y = (x * z) * (z⁻¹ * y)
     := by equate
+    -- example : x * y = (x * z²) * (z⁻² * y)
+    -- := by equate
     def conj (h x : G) := h * x * h ⁻¹ 
     @[equate] lemma conj_def : conj h x = h * x * h ⁻¹ := rfl
     example {h : G} : conj h (x) * conj h (y) = conj h (x * y) := 
     by equate
     example {h : G} : conj h (x * y) = conj h x * conj h y := 
+    by equate
+    example {h : G} : (conj h x)⁻¹ = conj h (x⁻¹):= 
+    by equate
+    example {h : G} : (conj h x⁻¹) = (conj h x)⁻¹ := 
     by equate
     example : x * y⁻¹ = (y * x⁻¹)⁻¹
     := by equate
@@ -108,14 +125,14 @@ section group_homs1
         (i1 : ∀ x, φ(ψ x) = x) 
         (i2 : ∀ x, ψ(φ x) = x) {x y : G} 
         : is_group_hom ψ :=
-    ⟨λ a b, by equate⟩ -- [FIXME] this usually works I promise
+    ⟨λ a b, by equate⟩
 end group_homs1
 
 section group_homs3
     lemma is_group_hom_mul_2 {α β} [group α] [comm_group β]
     (f g : α → β) [is_group_hom f] [is_group_hom g] :
     is_group_hom (λa, f a * g a) :=
-    ⟨assume a b, by equate⟩ -- [FIXME] when apply_core uses is_group_hom.mul it's using the wrong typeclass instance!!
+    ⟨assume a b, by equate⟩
     #print is_group_hom_mul_2
 end group_homs3
 

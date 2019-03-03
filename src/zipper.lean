@@ -392,8 +392,9 @@ namespace zipper
         prod.snd 
             <$> smallest_absent_subterms_aux lhs 
                 (λ s, do
+                    hlcst ← bnot <$> no_local_const_terms s,
                     is_term ← expr.is_term s.current,
-                     pure $ is_term && expr.is_composite s.current) 
+                     pure $ hlcst && is_term && expr.is_composite s.current) 
                 [] rhs
 
     /--`lowest_uncommon_subterms l z` finds the smallest subterms of z that are not a subterm of `l`. Subterms must include a local_const -/
