@@ -141,6 +141,10 @@ meta def expr.const_name : expr → option name
 |(expr.mvar unique pretty _) := some unique
 |_ := none
 
+meta def expr.as_mvar : expr → option (name × name × expr)
+|(expr.mvar u p y) := some (u,p,y)
+|_ := none
+
 meta def expr.is_mvar : expr → bool
 |(expr.mvar _ _ _) := tt
 |_ := ff
@@ -149,6 +153,7 @@ meta def expr.is_sort : expr → bool
 |_ := ff
 
 meta def expr.size : expr → nat := λ e, expr.fold e 0 (λ e bd n, n+1)
+meta def expr.trans_count : expr → nat := λ e, expr.fold e 0 (λ e bd n, n+1 <| expr.is_app_of e `eq.trans |> n) 
 
 meta def expr.is_term (e : expr) : tactic bool := do
     T ← infer_type e,

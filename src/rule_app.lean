@@ -73,7 +73,7 @@ meta def rule_rewrite : rule → zipper → tactic rule_app := λ r lhs, do
            one idea to resolve this is to make a pattern for each rule and hope that `match_pattern` is faster. -/
         --timetac "apply_core" $
         /- [BUG] this fails when it shouldn't on matching eg `X (Y * Z)` -/
-        tactic.apply_core r.pf {md := transparency.none, unify := tt},
+        tactic.apply_core r.pf {md := transparency.none, unify := tt, instances := ff},
         all_goals $ try $ apply_instance <|> prop_assumption,
         pure ()
     ),
@@ -99,7 +99,7 @@ meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
     -- timetac "unify" $ 
     --tactic.unify r.lhs lhs.current transparency.none tt,
     -- timetac "apply_core" $
-    tactic.apply_core r.pf {md := transparency.none, unify := tt},
+    tactic.apply_core r.pf {md := transparency.none, unify := tt, instances := ff},
     all_goals $ try (apply_instance <|> prop_assumption),
     pure ()
   ),
@@ -146,7 +146,10 @@ meta def is_commuter (r : rule_app) : tactic bool := r.r.is_commuter
 
 meta def count_metas (r : rule_app) : tactic nat := do
         lhs ← tactic.instantiate_mvars r.lhs,
-        pure $ table.size $ expr.fold r.lhs (table.empty) (λ e _ t, if expr.is_mvar e then table.insert e t else t)
+        uns ← zipper.traverse_proper (λ t e, pure $ match (expr.as_mvar e.current) with |none := t |(some ⟨u,_,_⟩) := table.insert u t end) (table.empty) lhs,
+        -- uns ← pure $ expr.mfold r.lhs (table.empty : table name) (λ e _ t, option.cases_on (expr.as_mvar e) t (λ ⟨u,_,_⟩, table.insert u t)),
+        -- tactic.trace_m "count_metas: " $ (r,uns),
+        pure $ table.size $ uns
 
 meta def flip (ra : rule_app) : tactic rule_app := do
   rf ← rule.flip ra.r,

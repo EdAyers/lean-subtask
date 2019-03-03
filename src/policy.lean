@@ -54,6 +54,7 @@ meta def get_merger_actions : list action → list action → M ( list action)
 meta def score_rule (r : rule_app) : M int := do
     is_local ← r.is_local_hypothesis,
     meta_count ← r.count_metas, 
+    if (meta_count > 1) then pure (-10) else do
     ce ← get_ce,
     lookahead ← get_lookahead,
     -- [IDEA]: score by symbol overlap
@@ -63,17 +64,14 @@ meta def score_rule (r : rule_app) : M int := do
     let symm_diff := table.size (ce_symbs ∪ lhs_symbs) - overlap,
     -- [TODO] if the LHS is in the lookahead table then use that
     has_diom ← 
-        if ¬ expr.is_composite r.r.lhs then pure ff else
-            bnot 
-            <$> list.empty 
-            <$> list.mchoose (λ x : rule_app, 
-                state_t.lift 
-                --$ tactic.hypothetically' 
-                $ (do 
-                    zipper.find_subterm r.lhs (zipper.zip $ rule_app.rhs x), 
-                    pure x)
-            ) lookahead
-        ,
+        (if ¬ expr.is_composite r.r.lhs then pure ff else (do
+            let pts := ce :: lookahead.map rule_app.rhs,
+            matches ← state_t.lift $ list.mchoose (λ x, do
+                zipper.find_subterm r.lhs (zipper.zip x),
+                pure x
+            ) pts,
+            pure $ bnot $ list.empty $ matches
+        )),
     is_comm ← rule_app.is_commuter r,
     pure 
         $ (if is_comm then -5 else 0) 

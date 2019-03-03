@@ -133,8 +133,9 @@ meta def can_use_commutativity : expr → M bool := λ e, (do
     pure tt
 ) <|> pure ff
 
-meta def task.refine (t : task) : M refinement :=
-try_dioms t <|>
+meta def task.refine (t : task) : M refinement := do
+    try_dioms t <|> 
+    --pure (++) <*> (try_dioms t <|> pure ∅) <*> 
 match t with
 |(task.Create n e) := do
     rss ← (list.singleton <$> can_use_ReduceDistance e) <|> pure [],
@@ -189,10 +190,10 @@ match t with
     -- trace_m "refine annihilate: " $ rss,
     if ¬ rss.empty then
         pure $ ([],[strategy.ReduceDistance x x])
-    else pure ([],[])
+    else pure ∅ 
 |(task.Destroy x) := do
     rt ← get_rule_table,
-    some xu ← pure $ zipper.up x | pure ([],[]),
+    some xu ← pure $ zipper.up x | pure ∅,
     submatches ← rt.submatch_lhs x.current,
     submatches ← list.mmap (λ r, rule_app.flip r) submatches,
     ⟨breakups,rewrites⟩ ← list.mpartition (λ r, 

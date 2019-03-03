@@ -46,6 +46,21 @@ namespace submatch
         tactic.hypothetically' (do 
             unify f₂ f,
             unify a₂ a,
+            -- not allowed any typeclass instances or
+            problems ← ms.mfilter (λ m, do
+                 y ← infer_type m,
+                 iscl ← is_class y,
+                 isprop ← is_prop y,
+                 pure $ if iscl || isprop then tt else ff
+            ),
+            tactic.set_goals problems,
+            -- trace_state,
+            all_goals (apply_instance <|> assumption),
+
+            n ← num_goals,
+            guard (n = 0),
+
+            
             mrule.instantiate_mvars
         ) 
         --trace_state,
@@ -152,9 +167,10 @@ namespace rule_table
     meta instance : has_to_tactic_format rule_table := ⟨tactic.pp ∘ head_table⟩
 
     /--`submatch e rt` finds rules such that the rhs of the rule contains `e`-/
-    meta def submatch : expr → rule_table → tactic (list rule_app) | e rt :=
-        let key := get_key e in
-        let submatches := rt.submatch_table.get key in
+    meta def submatch : expr → rule_table → tactic (list rule_app) | e rt := do
+        let key := get_key e,
+        let submatches := rt.submatch_table.get key,
+        -- tactic.trace_m "submatch: " $ submatches,
         if (key = `rule_table.app) 
         then list.mchoose (robot.submatch.run_app e) submatches
         else list.mchoose (robot.submatch.run e) submatches

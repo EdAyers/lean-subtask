@@ -1,7 +1,7 @@
-import .engine2 .policy
+import .engine .policy
 import algebra.group_power
 import tactic.ring
-/- A prototype version of the tactic. -/
+/-  The `equate` tactic. -/
 
 namespace robot
 
@@ -19,6 +19,7 @@ meta def get_equate_rule_table : tactic rule_table :=
 
 run_cmd attribute.register `robot.equate_user_attr
 
+/-- Solves simple equalities using lemmas tagged with `equate`. -/
 meta def equate (names : list name := []) := do
     base ← get_equate_rule_table,
     bonus ← rule_table.of_names names,

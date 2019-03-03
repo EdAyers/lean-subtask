@@ -118,6 +118,8 @@ meta structure state :=
 (bgc : bigram_cache)
 
 meta def refinement := list task × list strategy
+meta instance : has_append refinement := ⟨λ ⟨ts₁,ss₁⟩ ⟨ts₂,ss₂⟩, ⟨ts₁ ++ ts₂, ss₁ ++ ss₂⟩⟩
+meta instance : has_emptyc refinement := ⟨⟨[],[]⟩⟩
 meta def action := (strategy × Z)
 meta instance : has_to_tactic_format action := ⟨λ ⟨s,_⟩, tactic.pp s⟩
 
