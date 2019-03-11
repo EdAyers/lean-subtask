@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .rule .expr_zipper .rule_table
 
 namespace robot

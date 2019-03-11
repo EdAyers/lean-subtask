@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 open robot
 universe u 
@@ -15,10 +16,10 @@ section sets
     by equate
     @[equate] def A7l : (B ∪ C) ∩ A = (B ∩ A) ∪ (C ∩ A) := 
     by equate
-    example : (A ∪ B) \ A = B \ A
+    example : (A ∪ B) \ A = B \ A -- [FIXME]
     := by equate
     example : (A ∪ B) \ C = A \ C ∪ B \ C
     := by equate
-    example : A \ C ∪ B \ C = (A ∪ B) \ C 
+    example : A \ C ∪ B \ C = (A ∪ B) \ C  -- [FIXME]
     := by equate
 end sets

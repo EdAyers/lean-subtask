@@ -1,99 +1,106 @@
-/- Expression zipper -/
+/- Author: E.W.Ayers © 2019 -/
+
+/- Expression zipper. -/
 import .util .rule
 namespace expr
 
 /-- Labels for each recursive argument of a constructor for `expr`. -/
 @[derive decidable_eq]
-meta inductive coord 
+inductive coord 
 |app_left     |app_right
 |lam_var_type |lam_body
 |pi_var_type  |pi_body
 |elet_type    |elet_assignment |elet_body
-meta def coord.code: coord → ℕ |coord.app_left          := 0 |coord.app_right         := 1 |coord.lam_var_type      := 2 |coord.lam_body          := 3 |coord.pi_var_type       := 4 |coord.pi_body           := 5 |coord.elet_type         := 6 |coord.elet_assignment   := 7 |coord.elet_body         := 8
-meta instance coord.has_lt : has_lt coord := ⟨λ x y, x.code < y.code⟩
-meta instance coord.dec_lt : decidable_rel ((<) : coord → coord → Prop) := by apply_instance
+def coord.code: coord → ℕ |coord.app_left          := 0 |coord.app_right         := 1 |coord.lam_var_type      := 2 |coord.lam_body          := 3 |coord.pi_var_type       := 4 |coord.pi_body           := 5 |coord.elet_type         := 6 |coord.elet_assignment   := 7 |coord.elet_body         := 8
+instance coord.has_lt : has_lt coord := ⟨λ x y, x.code < y.code⟩
+instance coord.dec_lt : decidable_rel ((<) : coord → coord → Prop) := by apply_instance
 /-- A list of `coord`s, specifying a position in an expression. The first coordinate says which way to go on the root.-/
-meta def address := list coord
-meta instance address.has_lt : has_lt address := show has_lt (list coord), by apply_instance
-meta instance address.dec_lt : decidable_rel ((<) : address → address → Prop) := by apply_instance
-meta instance address.has_append : has_append address := ⟨list.append⟩
+def address := list coord
+instance address.has_lt : has_lt address := show has_lt (list coord), by apply_instance
+instance address.dec_lt : decidable_rel ((<) : address → address → Prop) := by apply_instance
+instance address.has_append : has_append address := ⟨list.append⟩
 /-- `is_below x y` is true when `∃ z, y ++ z = x` -/
-meta def address.is_below : address → address → bool
+def address.is_below : address → address → bool
 |_ [] := tt -- everything is below root.
 |[] _ := ff -- root is below nothing but itself.
 |(h₁ :: t₁) (h₂ :: t₂) := h₁ = h₂ ∧ address.is_below t₁ t₂
 infixr  ` ≺ `:50 := address.is_below
-/-- A path is the part of the zipper that remembers the stuff above the zipper's cursor.-/
-@[derive decidable_eq]
-meta inductive path
-|app_left        (left : unit) (right : expr) : path
-|app_right       (left : expr) (right : unit) : path
-|lam_var_type    (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
-|lam_body        (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
-|pi_var_type     (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path
-|pi_body         (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path
-|elet_type       (var_name : name) (type : unit) (assignment : expr)    (body : expr) : path
-|elet_assignment (var_name : name) (type : expr) (assignment : unit)    (body : expr) : path
-|elet_body       (var_name : name) (type : expr) (assignment : expr)    (body : unit) : path
+namespace zipper
+    /-- A path is the part of the zipper that remembers the stuff above the zipper's cursor.-/
+    @[derive decidable_eq]
+    meta inductive path_entry
+    |app_left        (left : unit) (right : expr) : path_entry
+    |app_right       (left : expr) (right : unit) : path_entry
+    |lam_var_type    (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path_entry
+    |lam_body        (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path_entry
+    |pi_var_type     (var_name : name) (bi : binder_info) (var_type : unit) (body : expr) : path_entry
+    |pi_body         (var_name : name) (bi : binder_info) (var_type : expr) (body : unit) : path_entry
+    |elet_type       (var_name : name) (type : unit) (assignment : expr)    (body : expr) : path_entry
+    |elet_assignment (var_name : name) (type : expr) (assignment : unit)    (body : expr) : path_entry
+    |elet_body       (var_name : name) (type : expr) (assignment : expr)    (body : unit) : path_entry
+    /-- A context entry for the zipper's cursor. 
+    In the current implementation; as zippers traverse below lambdas, 
+    pis and elets, they don't replace de-Bruijn indices with local constants.
+    -/
+    @[derive decidable_eq]
+    meta inductive context_entry
+    |Hyp      (n : name) (bi : binder_info) (type : expr)  : context_entry
+    |Assigned (n : name) (type : expr) (assignment : expr) : context_entry
 
-meta def path.to_coord : path → coord
-|(path.app_left _ _)            := coord.app_left
-|(path.app_right _ _)           := coord.app_right
-|(path.lam_var_type _ _ _ _)    := coord.lam_var_type
-|(path.lam_body _ _ _ _)        := coord.lam_body
-|(path.pi_var_type _ _ _ _)     := coord.pi_var_type
-|(path.pi_body _ _ _ _)         := coord.pi_body
-|(path.elet_type _ _ _ _)       := coord.elet_type
-|(path.elet_assignment _ _ _ _) := coord.elet_assignment
-|(path.elet_body _ _ _ _)       := coord.elet_body
+    namespace path_entry
+        meta def to_coord : path_entry → coord
+        |(app_left _ _)            := coord.app_left
+        |(app_right _ _)           := coord.app_right
+        |(lam_var_type _ _ _ _)    := coord.lam_var_type
+        |(lam_body _ _ _ _)        := coord.lam_body
+        |(pi_var_type _ _ _ _)     := coord.pi_var_type
+        |(pi_body _ _ _ _)         := coord.pi_body
+        |(elet_type _ _ _ _)       := coord.elet_type
+        |(elet_assignment _ _ _ _) := coord.elet_assignment
+        |(elet_body _ _ _ _)       := coord.elet_body
 
-meta def path.to_address : list path → address := list.map path.to_coord ∘ list.reverse
-open tactic 
-meta def path.to_tactic_format : path → tactic format
-|(path.app_left l r)            := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
-|(path.app_right l r)           := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
-|(path.lam_var_type n _ y b)    := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
-|(path.lam_body n _ y b)        := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
-|(path.pi_var_type n _ y b)     := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
-|(path.pi_body n _ y b)         := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
-|(path.elet_type n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
-|(path.elet_assignment n y a b) := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
-|(path.elet_body n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
-meta instance path.has_to_tactic_format : has_to_tactic_format path := ⟨path.to_tactic_format⟩
-/-- A context entry for the zipper's cursor. 
-In the current implementation; as zippers traverse below lambdas, 
-pis and elets, they don't replace de-Bruijn indices with local constants.
- -/
-@[derive decidable_eq]
-meta inductive src
-|Hyp      (n : name) (bi : binder_info) (type : expr)  : src
-|Assigned (n : name) (type : expr) (assignment : expr) : src
+        meta def to_address : list path_entry → address := list.map to_coord ∘ list.reverse
+        open tactic 
+        meta def to_tactic_format : path_entry → tactic format
+        |(app_left l r)            := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
+        |(app_right l r)           := (pure $ λ l r, l ++ " $ " ++ r) <*> pp l <*> pp r
+        |(lam_var_type n _ y b)    := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+        |(lam_body n _ y b)        := (pure $ λ n y b, "λ " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+        |(pi_var_type n _ y b)     := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+        |(pi_body n _ y b)         := (pure $ λ n y b, "Π " ++ n ++ " : " ++ y ++ ", " ++ b) <*> pp n <*> pp y <*> pp b
+        |(elet_type n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+        |(elet_assignment n y a b) := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+        |(elet_body n y a b)       := (pure $ λ n y a b, "let " ++ n ++ " : " ++ y ++ " := " ++ a ++ " in " ++ b) <*> pp n <*> pp y <*> pp a <*> pp b
+        meta instance has_to_tactic_format : has_to_tactic_format path_entry := ⟨to_tactic_format⟩
+        meta def to_context_entry : path_entry → option context_entry
+        |(lam_body  n bi y   b) := some $ context_entry.Hyp      n bi y
+        |(pi_body   n bi y   b) := some $ context_entry.Hyp      n bi y
+        |(elet_body n    y a b) := some $ context_entry.Assigned n    y a
+        |_ := none
+        meta def to_context : list path_entry → list context_entry 
+        := list.filter_map to_context_entry
+    end path_entry
 
-meta def path.to_src : path → option src
-|(path.lam_body n bi y b) := some $ src.Hyp n bi y
-|(path.pi_body n bi y b) := some $ src.Hyp n bi y
-|(path.elet_body n y a b) := some $ src.Assigned n y a
-|_ := none
-
-meta def path.to_context : list path → list src := list.filter_map path.to_src
-
-namespace src
-    meta def type : src → expr
-    |(Hyp _ _ t) := t
-    |(Assigned _ t _) := t
-    meta def name : src → name
-    |(Hyp n _ _) := n
-    |(Assigned n _ _) := n
-    meta def to_local : src → tactic expr
-    |(Hyp n bi t) := tactic.mk_local' n bi t
-    |(Assigned n t _) := tactic.mk_local' n binder_info.default t
-    meta def pexpr_pis_of_ctxt : list src → pexpr → pexpr
-    |[] e := to_pexpr e
-    |((src.Hyp n bi y) :: rest) e := pexpr_pis_of_ctxt rest $ @expr.pi ff n bi (to_pexpr y) $ e
-    |((src.Assigned n y a) :: rest) e := pexpr_pis_of_ctxt rest $ expr.elet n (to_pexpr y) (to_pexpr a) $ e
-    meta def hyps_of_telescope : telescope → list src := list.map (λ ⟨n,bi,y⟩, src.Hyp n bi y)
-end src
-
+    namespace context_entry
+        meta def type : context_entry → expr
+        |(Hyp      _ _ y  ) := y
+        |(Assigned _   y _) := y
+        meta def name : context_entry → name
+        |(Hyp      n _ _  ) := n
+        |(Assigned n   _ _) := n
+        meta def to_local : context_entry → tactic expr
+        |(Hyp      n bi t  ) := tactic.mk_local' n bi t
+        |(Assigned n    t _) := tactic.mk_local' n binder_info.default t
+        meta def pexpr_pis_of_ctxt : list context_entry → pexpr → pexpr
+        |[] e := to_pexpr e
+        |((context_entry.Hyp n bi y) :: rest) e := 
+            pexpr_pis_of_ctxt rest $ @expr.pi ff n bi (to_pexpr y) $ e
+        |((context_entry.Assigned n y a) :: rest) e := 
+            pexpr_pis_of_ctxt rest $ expr.elet n (to_pexpr y) (to_pexpr a) $ e
+        meta def hyps_of_telescope : telescope → list context_entry 
+        := list.map (λ ⟨n,bi,y⟩, context_entry.Hyp n bi y)
+    end context_entry
+end zipper
 /-- 
 A zipper over expressions. You can think of this as being like a 'cursor' that can move around an `expr`.
 It does not replace bound variables with local constants, but instead maintains its own 'mini-context' of the binders that it is under.
@@ -102,7 +109,7 @@ Reference: [Functional Pearl - The Zipper](https://www.st.cs.uni-saarland.de/edu
  -/
 @[derive decidable_eq]
 meta structure zipper :=
-(path : list path)
+(path : list zipper.path_entry)
 (current : expr)
 
 /-- Result type of calling `zipper.down`.  -/
@@ -122,7 +129,7 @@ meta def down_result.children : down_result → list zipper
 |(down_result.elet n t a b) := [t,a,b]
 
 namespace zipper
-    open path
+    open path_entry
     /--Move the cursor down the expression tree.-/
     meta def down : zipper → down_result
     |⟨p, expr.app f a⟩ := 
@@ -204,8 +211,8 @@ namespace zipper
     |f ⟨p,e⟩ := ⟨p,f e⟩
     meta def mmap {T} [monad T] : (expr → T expr) → zipper → T zipper
     |f ⟨p,e⟩ := zipper.mk p <$> f e
-    meta def address : zipper → address := path.to_address ∘ path
-    meta def ctxt : zipper → list src := path.to_context ∘ path
+    meta def address : zipper → address := to_address ∘ path
+    meta def ctxt : zipper → list context_entry := to_context ∘ path
     /-- The number of binders above the cursor. -/
     meta def binder_depth : zipper → ℕ := list.length ∘ ctxt
     /-- Replace the current subexpression and unzip. -/
@@ -214,14 +221,15 @@ namespace zipper
     meta def is_constant : zipper → bool := expr.is_constant ∘ current
     /--True when the current expression does not contain local constants -/
     meta def no_local_consts : zipper → bool := list.empty ∘ expr.list_local_consts ∘ current 
-    meta def no_local_const_terms : zipper → tactic bool := λ z, list.empty <$> (expr.list_local_const_terms $ current $ z)
+    meta def no_local_const_terms : zipper → tactic bool 
+    := λ z, list.empty <$> (expr.list_local_const_terms $ current $ z)
     meta def is_local_constant : zipper → bool := expr.is_local_constant ∘ current
     meta def is_mvar : zipper → bool := expr.is_mvar ∘ current
     meta def is_terminal : zipper → bool := λ z, z.down = down_result.terminal
     /--Infer the type of the subexpression at the cursor position. -/
     meta def infer_type : zipper → tactic expr := λ z, do
             ⟨ins,lcs⟩ ← list.mfoldl (λ ct s, do
-                l ← src.to_local s,
+                l ← context_entry.to_local s,
                 pure $ (expr.instantiate_var ct.1 l, l::ct.2)
             ) (z.current,([] : list expr)) z.ctxt,
             y ← tactic.infer_type ins,
@@ -463,7 +471,7 @@ namespace zipper
         )
 
     meta def is_app_right : zipper → bool
-    |⟨(path.app_right _ _)::t,_⟩ := tt
+    |⟨(app_right _ _)::t,_⟩ := tt
     |_ := ff
 
     meta def right : zipper → option zipper
@@ -503,38 +511,5 @@ namespace zipper
     |z₁ z₂ := do 
           list.meq_by (λ x y, pure $ x = y) z₁.path z₂.path
 
-    -- meta def clone_mvars : zipper → tactic (zipper)
-    -- |z := do 
-    --     (a,z) ← zipper.traverse (λ (t:dict name expr) z, _) (∅,z) ,
-    --     sorry
-
-    -- meta def unify (l : zipper) (r : zipper) : tactic unit := do 
-    --     hypothetically (do
-    --         l_ctxt ← src.intro_ctxt [] $ l.ctxt.reverse,
-    --         r_ctxt ← src.intro_ctxt [] $ r.ctxt.reverse,
-    --         lc ← pure $ expr.instantiate_vars l.current l_ctxt,
-    --         rc ← pure $ expr.instantiate_vars r.current r_ctxt,
-    --         tactic.unify lc rc,
-    --         -- now some of the metavariables in l_ctxt and r_ctxt will be assigned.
-    --         -- also note that these assignments can depend on other non-assigned metavariables.
-    --         -- [FIXME] for now, we ignore this case and assume that the metas are never assigned wrt other metas.
-    --         expr.a
-    --     )
-
-    -- /-- `match_current e z` tries to match `e` with `z.current` in `z`'s context. 
-    --     Recall that _matching_ is distinct from _unifying_ in that only metavariables in `z.current` may be assigned from this process.
-    --     So if `z.ctxt` has metavariables, these can be assigned. -/
-    -- meta def match_current : expr → zipper → tactic zipper | e z := do
-    --     -- [HACK] for now, assume that the zipper's context is composed entirely of metas.
-    --     T ← tactic.infer_type e,
-    --     current ← tactic.to_expr $ src.pexpr_pis_of_ctxt z.ctxt (to_pexpr z.current),
-    --     tactic.unify e current,
-
-    --     let c := z.current,
-    --     let t := z.ctxt.reverse,
-        
-    --     notimpl
-
 end zipper
-
 end expr

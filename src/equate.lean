@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .engine .policy
 import algebra.group_power
 import tactic.ring
@@ -24,7 +25,7 @@ meta def equate (names : list name := []) := do
     base ← get_equate_rule_table,
     bonus ← rule_table.of_names names,
     all ← rule_table.join bonus base,
-    tactic.timetac "time: " $ robot.run robot.caveman_policy all
+    tactic.timetac "time: " $ robot.run robot.simple_policy all
 
 /- DEFAULT RULES: -/
 
@@ -57,7 +58,7 @@ attribute [equate] sub_eq_add_neg
 attribute [equate] zero_sub
 attribute [equate] sub_zero
 attribute [equate] sub_neg_eq_add
--- attribute [equate] add_sub_assoc
+-- attribute [equate] add_sub_assoc -- [NOTE] commented out because it short-circuits an exampleproof
 
 attribute [equate] left_distrib
 attribute [equate] right_distrib
@@ -72,7 +73,9 @@ attribute [equate] mul_sub_right_distrib
 
 @[equate] lemma comp_def {α β γ : Type*} {f : α → β} {g : β → γ} {x : α} : (g ∘ f) x = g (f x) := rfl
 
-
+/- Additional equalities for rings.
+   These are needed because `equate` does not unfold definitions. 
+ -/
 namespace ring_theory
     universe u
     variables {R : Type u} [comm_ring R] {x y z a b c : R}
@@ -81,10 +84,10 @@ namespace ring_theory
     @[equate] def X2 : 2 * x = x + x  := by ring
 end ring_theory
 
+/- Some equalities for set theory. -/
 namespace set_rules
     universe u
     variables {α : Type u} {A B C : set α}
-    --instance : has_sub (set α) := ⟨λ A B, A ∩ (- B)⟩
     def ext : (∀ a, a ∈ A ↔ a ∈ B) → A = B := begin intro, funext, rw <-iff_eq_eq, apply a x end
     @[equate] def A1 : A \ B = A ∩ (- B) := rfl
     @[equate] def A2 : - ( B ∩ C ) = -B ∪ -C := ext $ λ a, ⟨λ h, classical.by_cases (λ aB, classical.by_cases (λ aC, absurd (and.intro aB aC) h) or.inr ) or.inl,λ h, or.cases_on h (λ h ⟨ab,_⟩, absurd ab h) (λ h ⟨_,ac⟩, absurd ac h)⟩

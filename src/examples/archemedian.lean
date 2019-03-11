@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 import algebra.archimedean
 open robot

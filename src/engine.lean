@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .refine
 namespace robot
 open tree.zipper tactic

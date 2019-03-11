@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 import analysis.normed_space.basic tactic
 
@@ -12,9 +13,10 @@ variables {α : Type u} [normed_group α] {a : α } {μ : ℝ}
 attribute [equate] normed_field.norm_mul
 attribute [equate] dist_comm
 
---set_option pp.all true
-lemma norm_neg_2 (g : α) : ∥g∥ = ∥-g∥ :=
-calc ∥g∥ = ∥-g∥      : by equate
+-- even when `equate` can't get the answer in one go, you can use it to make proofs more readable:
+lemma norm_neg_2 (g : α) : ∥-g∥ = ∥g∥ :=
+calc ∥-g∥ = dist 0 g : by equate
+     ...  = ∥g∥      : by symmetry ; equate
 
 attribute [equate] norm_neg_2
 

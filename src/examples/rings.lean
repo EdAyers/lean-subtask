@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate tactic
 open robot
 universe u 
@@ -6,30 +7,19 @@ section rings
     attribute [equate] neg_sub 
 
     variables {α : Type u} [comm_ring α] {a b c d e p x y z : α}
-    example : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
-    by equate
-    example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
-    by equate
+
+
     @[equate] lemma sub_minus : - (a - b) = - a - - b := by equate
     -- comparison with new lemma added
-    lemma sumsq_1 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
+    lemma sumsq_with_equate : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by equate
-    lemma sumsq_2 : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
+    lemma sumsq_with_ring : (a + b) * (a + b) = a * a + 2 * (a * b) + b * b := 
     by ring
-
-    meta def trace_proof_size : name → tactic unit := λ n, (do
-        env ← tactic.get_env,
-        declaration.thm n e y p ← environment.get env n,
-        p ← pure $ task.get $ p,
-        tactic.trace $ expr.size p
-    )
-    run_cmd (trace_proof_size `sumsq_1)
-    run_cmd (trace_proof_size `sumsq_2)
-    
-    #print sumsq_1
-    #print sumsq_2
+    -- compare proof terms:
+    #print sumsq_with_equate
+    #print sumsq_with_ring
     -- example : (a + b) * (a - b) = a * a - b * b := 
-    -- by equate
+    -- by equate -- [FIXME]
     example : (a * d) * b + b * (c * e) = (a * d + c * e) * b := 
     by equate 
     example : a * b + b * c = (a + c) * b := 
@@ -37,34 +27,30 @@ section rings
     example : (a + c) * b = c * b + b * a := by equate
     example : (a + c) * b = c * b + b * a := by ring
 
-    /- In ideals.lean -- `(I : ideal α) : has_mul I.quotient` -/
-    example : (a * b - c * d) = b * a - b * c + (b * c - d * c) :=
-    by ring
-
-
-    /- In multiplicity.lean , `finite_mul_aux`. -/
-    -- example {a b p s x : α} {n m : ℕ } 
-    --     (h₁ : a = p * x) 
-    --     (h₂ : a * b = p ^ (n + m + 1) * s)
-    -- :   p * (x * b) = p * (p ^ (n - 1 + m + 1) * s) 
-    -- := by equate
-
-    example : (a + b) * (a - b) = a * a - b * b := 
+    example : (a * -d - b * - c) * e = -((a * d - b * c) * e) := 
     by equate
+    /- [NOTE] the below examples show that our system is not yet able to deal well
+    with 'unbalanced' problems where more than one occurrence of a variable is present.
+    We aim to fix this with the 'Merge' subtask. -/
+    example : (a * b - c * d) = b * a - b * c + (b * c - d * c) :=
+    by equate -- [FIXME]
+    example : (a + b) * (a - b) = a * a - b * b := 
+    by equate -- [FIXME]
     example : (a * b) - c + (b * a) = - c + 2 * (a *  b) := 
-    by equate  
+    by equate -- [FIXME]
     example : (a * b) - c + (b * a) = - c + (2 * a) *  b := 
-    by equate  
+    by equate -- [FIXME]
     example : (a * b) - c + (b * a) = - c + a * (b + b) := 
-    by equate  
+    by equate -- [FIXME]
 
-    /- Comparison of proof lengths. -/
-    lemma e1 : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 := by equate
-    #print e1
-    run_cmd trace_proof_size `e1
-    lemma e2 : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 :=
+    /- An extreme comparison of the differences in proof lengths and perils of normal form. -/
+    lemma sum_cube_with_equate : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 := by equate
+    lemma sum_cube_with_acrefl : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 :=
+         by ac_refl
+    /- `ring` does really badly because it puts the two expressions in to normal form. -/
+    lemma sum_cube_with_ring : (x+y)^3+(x+z)^3 = (z+x)^3+(y+x)^3 :=
          by ring
-    #print e2
-    run_cmd trace_proof_size `e2
-
+    #print sum_cube_with_equate -- uses eq.trans 3 times
+    #print sum_cube_with_acrefl -- uses eq.trans 9 times
+    #print sum_cube_with_ring
 end rings

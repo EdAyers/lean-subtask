@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .data
 namespace robot
 open tactic

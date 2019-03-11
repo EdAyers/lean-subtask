@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 open robot
 universe u
@@ -18,15 +19,13 @@ section additive_groups
     by equate
     example : - (x - y) = y - x := 
     by equate
-    example : (x - y) = -(y - x) := 
-    -- [TODO] do this with a kind of top-down create.
+    example : (x - y) = -(y - x) := -- [FIXME]
     by equate
-    example : (x - y) = -(y + - x) := 
-    -- [TODO] do this with a kind of top-down create.
+    example : (x - y) = -(y + - x) := -- [FIXME]
     by equate
     example : (- - x) + - y = -(y - x) := 
     by equate
-    example : (- - x) - y = -(y - x) := 
+    example : (- - x) - y = -(y - x) := -- [FIXME]
     by equate
     example : (x + y) + (z + w) = (x + z) + (y + w) := 
     by equate
@@ -47,13 +46,13 @@ section powers
     begin
         induction n,
         simp,
-        equate
+        equate -- [FIXME]
     end
     @[equate] lemma my_pow_succ' : a^(nat.succ n) = a^n * a :=
     by equate
     -- set_option pp.notation false
-    @[equate] lemma my_pow_1 : a^1 = a := by equate
-    @[equate] lemma my_pow_2 : a^2 = a * a := by equate
+    @[equate] lemma my_pow_1 : a^1 = a := by equate -- [FIXME]
+    @[equate] lemma my_pow_2 : a^2 = a * a := by equate -- [FIXME]
     @[equate] lemma my_pow_add : a^(m + n) = a^m * a^n :=
     begin
         induction m, 
@@ -82,7 +81,7 @@ section comm_monoid_powers
     := begin
         induction n,
         simp,
-        equate
+        equate -- [FIXME]
     end
 end comm_monoid_powers
 
@@ -98,9 +97,9 @@ end group_powers
 
 section group_homs1
     variables {H G : Type u} [group H] [group G] {φ : H → G} {ψ : G → H} {x y z h : G}
-    example : (x * z) * (z⁻¹ * y) = x * y
+    example : (x * z) * (z⁻¹ * y) = x * y -- [FIXME] finds an overly long soln
     := by equate
-    example : x * y = (x * z) * (z⁻¹ * y)
+    example : x * y = (x * z) * (z⁻¹ * y) -- [NOTE] this is an out-of-scope problem
     := by equate
     -- example : x * y = (x * z²) * (z⁻² * y)
     -- := by equate
@@ -109,11 +108,11 @@ section group_homs1
     example {h : G} : conj h (x) * conj h (y) = conj h (x * y) := 
     by equate
     example {h : G} : conj h (x * y) = conj h x * conj h y := 
-    by equate
+    by equate -- [FIXME]
     example {h : G} : (conj h x)⁻¹ = conj h (x⁻¹):= 
     by equate
     example {h : G} : (conj h x⁻¹) = (conj h x)⁻¹ := 
-    by equate
+    by equate -- [FIXME]
     example : x * y⁻¹ = (y * x⁻¹)⁻¹
     := by equate
     example :  (y * x⁻¹)⁻¹ = x * y⁻¹
@@ -133,7 +132,6 @@ section group_homs3
     (f g : α → β) [is_group_hom f] [is_group_hom g] :
     is_group_hom (λa, f a * g a) :=
     ⟨assume a b, by equate⟩
-    #print is_group_hom_mul_2
 end group_homs3
 
 

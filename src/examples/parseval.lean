@@ -1,4 +1,4 @@
-
+/- Author: E.W.Ayers © 2019 -/
 namespace parseval
 noncomputable theory
 constant α : Type

@@ -1,4 +1,6 @@
+/- Author: E.W.Ayers © 2019 -/
 universes u v
+/-- Writer monad transformer. -/
 structure writer_t (σ : Type u) (m : Type u → Type v) (α : Type u) : Type (max u v) :=
 (run : m (α × σ))
 attribute [pp_using_anonymous_constructor] writer_t

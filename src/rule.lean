@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .util .table
 open tactic
 /-- Member of a telescope.-/

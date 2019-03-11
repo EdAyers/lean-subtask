@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 open robot
 section
@@ -16,7 +17,7 @@ section
             intro l₁, induction l₁, intros, refl,
             intro, 
             equate, 
-            symmetry, equate
+            equate
     end
     open list
     @[equate] lemma assoc : (l ++ s) ++ t = l ++ (s ++ t) :=
@@ -57,7 +58,7 @@ namespace my_nat
         induction y, equate, equate
     end
     @[equate] lemma zero_add : x + my_nat.zero = x := begin 
-        induction x, equate, equate
+        induction x, equate, symmetry, equate -- [FIXME] remove symmetry
     end
     @[equate] lemma add_comm : x + y = y + x := begin
         induction x, 

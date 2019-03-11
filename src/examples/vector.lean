@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import ..equate
 
 open robot
@@ -29,7 +30,6 @@ notation `⟪` x `,` y `⟫`  := ip x y
 @[equate] lemma COMP_DEF {α β γ} {f : β → γ} {g : α → β} {x : α} : (f ∘ g) x = f (g x) := rfl
 
 open tactic
-open ez.zipper
 
 example (il : is_linear A) :
     μ • A (x) + ν • A (y) = A (μ • x + ν • y)  :=
@@ -40,7 +40,7 @@ example (il : is_linear A) :
 by equate 
 example (il : is_linear A) : 
     ⟪A† (x + y) + (w + v), z⟫ = ⟪A† x + v + A† y + w,z⟫ := 
-by equate 
+by equate -- [FIXME]
 example (il : is_linear A) :
     ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
 := by equate
@@ -63,6 +63,7 @@ example (il : is_linear A) :
     ⟪ A† ( u + v ) + w , x ⟫ = ⟪ A† u + w + A† v , x ⟫
 := by equate
 
+/- Can it find a better solution to the problem if we add in the proof that A† is linear? -/
 @[equate] lemma adj_linear_2 (il : is_linear A) : A†(x + y) = A†x + A†y := sorry
 
 example (il : is_linear A) :

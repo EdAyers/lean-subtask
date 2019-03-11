@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .M
 namespace robot
 open strategy task tactic expr
@@ -94,9 +95,6 @@ meta def get_distance_reducer : expr → expr → M (rule_app)
     drs ← list.minby (int.of_nat ∘ prod.fst) drs,
     pure drs.2
     
-
-
-
 meta def has_single_subterm : expr → M unit := λ a, do
     lhs ← get_ce,
     rhs ← get_rhs,
@@ -131,9 +129,10 @@ meta def can_use_commutativity : expr → M bool := λ e, (do
     pure tt
 ) <|> pure ff
 
+/-- Refinement operator for tasks. -/
 meta def task.refine (t : task) : M refinement := do
     try_dioms t <|> 
-    --pure (++) <*> (try_dioms t <|> pure ∅) <*> 
+    --pure (++) <*> (try_dioms t <|> pure ∅) <*> -- [INFO] this line adds dioms in addition to usual subtasks.
 match t with
 |(task.Create n e) := do
     rss ← (list.singleton <$> can_use_ReduceDistance e) <|> pure [],
@@ -204,7 +203,7 @@ match t with
     if breakups.empty then pure $ ([], list.map Use rewrites) else
     pure $ ([], list.map Use breakups)
 
-|_ := do -- MERGE
+|(task.Merge x) := do -- MERGE
     /- Find rules which will:
         a. perform a factorisation such that `x` is factorised.
         b. perform a straight merge such as `F(x) ∩ F(x) = F(x)` or `x + x = 2 * x`
@@ -218,6 +217,9 @@ match t with
     notimpl
 end
 
+/-- Execute the strategy. This will generally perform a conversion of the LHS of the goal.
+    But in principle one can do anything to the tactic state.
+ -/
 meta def strategy.execute : strategy → M unit
 |(strategy.ReduceDistance a b) := do
     repeat (do 
@@ -228,17 +230,13 @@ meta def strategy.execute : strategy → M unit
     run_conv $ rule_app.rewrite_conv r
 
 meta def strategy.refine : strategy → M refinement
-|(strategy.ReduceDistance a b) := pure $ ([],[])
+|(strategy.ReduceDistance a b) := 
+    -- The ReduceDistance strategy is merely a greedy algorithm. There are no subtasks.
+    pure $ ([],[])
 |(strategy.Use r)              := do
     ce ← get_ce,
     scs ← zipper.smallest_absent_subterms ce r.lhs,
     scs ← pure $ if scs.empty then [(1,zipper.zip r.lhs)] else scs,
-    -- subs : list zipper ← zipper.minimal_monotone (λ lz,
-    --     if lz.is_mvar || lz.is_constant then failure else do
-    --     --⟨r,ms⟩ ← rule.to_mvars r,
-    --     l : list unit ← zipper.maximal_monotone (λ rz, (hypothetically' $ unify lz.current rz.current)) $ zipper.zip $ ce,
-    --     if l.empty then pure lz else failure
-    -- ) $ zipper.zip $ r.lhs,
     subs ← scs.mmap (λ z, task.Create z.1 <$> instantiate_mvars z.2.current),
     pure ⟨subs, []⟩
 

@@ -1,3 +1,4 @@
+/- Author: E.W.Ayers © 2019 -/
 import .M .refine
 open expr tactic expr.zipper
 namespace robot
@@ -86,7 +87,7 @@ meta def score_strategy : strategy → M int
      pure $ max (10 - d) 0
 |(strategy.Use r) := score_rule r
 
-meta def caveman_evaluate :  list action → M evaluation
+meta def simple_evaluate :  list action → M evaluation
 |[] := pure []
 |l@(⟨s,sz⟩::t)  := do
     -- sisters ← get_sister_candidate_actions_aux sz [],
@@ -118,7 +119,7 @@ meta def caveman_evaluate :  list action → M evaluation
 /-- A simple scoring heuristic for lists of terms.
     [TODO] For now this is just whatever works but there is some theory that can go in here.
 -/
-meta def caveman_overall_score : list (action × score) → M score
+meta def simple_overall_score : list (action × score) → M score
 |[x] := pure $ 10
 |l  := do
     let l := l.filter (λ x, x.2 ≥ -5),
@@ -129,9 +130,9 @@ meta def caveman_overall_score : list (action × score) → M score
     |⟨xs,_⟩ := pure $ 5 - xs.length
     end
 
-meta def caveman_policy : policy := 
-    { evaluate := caveman_evaluate
-    , get_overall_score := caveman_overall_score
+meta def simple_policy : policy := 
+    { evaluate := simple_evaluate
+    , get_overall_score := simple_overall_score
     }
 
 end robot

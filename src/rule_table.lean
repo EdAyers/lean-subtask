@@ -1,4 +1,4 @@
-
+/- Author: E.W.Ayers © 2019 -/
 import .table .rule_app .expr_zipper
 open tactic expr
 namespace robot

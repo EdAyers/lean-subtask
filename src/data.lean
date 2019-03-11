@@ -1,3 +1,5 @@
+/- Author: E.W.Ayers © 2019 -/
+
 import .table .rule .rule_table .tree .bigram
 namespace robot
 
@@ -42,7 +44,6 @@ namespace task
     |(CreateAll x) (CreateAll y) := tactic.is_success $ tactic.is_def_eq x y
     |(Annihilate x) (Annihilate y) := tactic.is_success $ tactic.is_def_eq x y
     |(Merge x) (Merge y) := tactic.is_success $ tactic.is_def_eq x y
-    -- |(Create2 x) (Create2 y) := tactic.is_success $ tactic.is_def_eq x y
     |_ _ := pure ff
 end task
 open task
