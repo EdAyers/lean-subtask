@@ -1,7 +1,7 @@
 /- Author: E.W.Ayers © 2019 -/
 
 /- Expression zipper. -/
-import .util .rule
+import .util .table
 namespace expr
 
 /-- Labels for each recursive argument of a constructor for `expr`. -/
@@ -11,7 +11,7 @@ inductive coord
 |lam_var_type |lam_body
 |pi_var_type  |pi_body
 |elet_type    |elet_assignment |elet_body
-def coord.code: coord → ℕ |coord.app_left          := 0 |coord.app_right         := 1 |coord.lam_var_type      := 2 |coord.lam_body          := 3 |coord.pi_var_type       := 4 |coord.pi_body           := 5 |coord.elet_type         := 6 |coord.elet_assignment   := 7 |coord.elet_body         := 8
+def coord.code: coord → ℕ |coord.app_left := 0 |coord.app_right := 1 |coord.lam_var_type := 2 |coord.lam_body := 3 |coord.pi_var_type := 4 |coord.pi_body := 5 |coord.elet_type := 6 |coord.elet_assignment := 7 |coord.elet_body := 8
 instance coord.has_lt : has_lt coord := ⟨λ x y, x.code < y.code⟩
 instance coord.dec_lt : decidable_rel ((<) : coord → coord → Prop) := by apply_instance
 /-- A list of `coord`s, specifying a position in an expression. The first coordinate says which way to go on the root.-/
@@ -97,8 +97,8 @@ namespace zipper
             pexpr_pis_of_ctxt rest $ @expr.pi ff n bi (to_pexpr y) $ e
         |((context_entry.Assigned n y a) :: rest) e := 
             pexpr_pis_of_ctxt rest $ expr.elet n (to_pexpr y) (to_pexpr a) $ e
-        meta def hyps_of_telescope : telescope → list context_entry 
-        := list.map (λ ⟨n,bi,y⟩, context_entry.Hyp n bi y)
+        -- meta def hyps_of_telescope : telescope → list context_entry 
+        -- := list.map (λ ⟨n,bi,y⟩, context_entry.Hyp n bi y)
     end context_entry
 end zipper
 /-- 
