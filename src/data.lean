@@ -1,6 +1,6 @@
 /- Author: E.W.Ayers © 2019 -/
 
-import .table .rule .rule_table .tree .bigram
+import .table .rule .rule_table .tree
 namespace robot
 
 @[derive decidable_eq]
@@ -9,8 +9,8 @@ meta inductive task : Type
 |Create : ℕ → expr → task
 /- Use a term annihilation move. For example `X * X⁻¹ = e` annihilates anything in X. -/
 |Annihilate : expr → task
-/- passes when we remove the given term from the CE. 
-Generally this is only used when a variable appears in the CE but not 
+/- passes when we remove the given term from the CE.
+Generally this is only used when a variable appears in the CE but not
 in the target and there are no rules explicitly removing the variable. -/
 |Destroy : expr.zipper → task
 |Merge : expr → task
@@ -63,7 +63,7 @@ namespace strategy
     |s₁ s₂ := s₁.code < s₂.code
     meta instance has_lt : has_lt strategy := ⟨λ x y, lt x y⟩
     meta instance decidable_lt : decidable_rel ((<) : strategy → strategy → Prop) := by apply_instance
-    meta instance : has_to_tactic_format robot.strategy := 
+    meta instance : has_to_tactic_format robot.strategy :=
     ⟨λ s, match s with
         | (Use x) := do x ← tactic.pp x, pure $ "Use " ++ x
         | (ReduceDistance x y) := pure (λ x y, "ReduceDistance " ++ x ++ " " ++ y) <*> tactic.pp x <*> tactic.pp y
@@ -94,13 +94,13 @@ namespace tree_entry
     meta def is_strat : tree_entry → bool := option.is_some ∘ as_strat
     /-- Get the achieved child subtasks for this entry. -/
     meta def achieved : tree_entry → list robot.task | (tree_entry.strat _ a) := a | (tree_entry.task _ a) := a
-    meta def map_achieved (f : list robot.task → list robot.task) : tree_entry → tree_entry 
+    meta def map_achieved (f : list robot.task → list robot.task) : tree_entry → tree_entry
     | (tree_entry.strat s a) := (tree_entry.strat s $ f a) | (tree_entry.task t a) := tree_entry.task t $ f a
     meta def push_achieved (t : robot.task) : tree_entry → tree_entry := map_achieved ((::) t)
     meta instance : has_to_tactic_format tree_entry := ⟨λ x, match x with |(task t _ ) := tactic.pp t | (strat s _ ) := tactic.pp s end⟩
     meta def is_def_eq : tree_entry → tree_entry → tactic bool
     |(task a _) (task b _) := task.is_def_eq a b
-    |(strat a _) (strat b _) := strategy.is_def_eq a b 
+    |(strat a _) (strat b _) := strategy.is_def_eq a b
     |_ _ := pure ff
     meta def is_eq : tree_entry → tree_entry → tactic bool
     |(task a _) (task b _) := pure $ a = b
@@ -108,7 +108,7 @@ namespace tree_entry
     |_ _ := pure ff
 end tree_entry
 
-meta def task_tree := tree tree_entry 
+meta def task_tree := tree tree_entry
 meta def task_zipper := tree.zipper tree_entry
 notation `Z` := task_zipper
 
@@ -116,7 +116,6 @@ meta structure state :=
 (lookahead : list rule_app)
 (path : list expr)
 (rt : rule_table)
-(bgc : bigram_cache)
 
 meta def refinement := list task × list strategy
 meta instance : has_append refinement := ⟨λ ⟨ts₁,ss₁⟩ ⟨ts₂,ss₂⟩, ⟨ts₁ ++ ts₂, ss₁ ++ ss₂⟩⟩

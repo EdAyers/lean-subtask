@@ -11,7 +11,6 @@ meta instance M.of_conv {α} : has_coe (conv α) (M α) := ⟨state_t.lift⟩
 meta def get_ce : M expr := state_t.lift (conv.lhs >>= instantiate_mvars)
 meta def get_rhs : M expr := state_t.lift (conv.rhs >>= instantiate_mvars)
 meta def get_lookahead : M (list rule_app) := state.lookahead <$> get
-meta def get_triggers : expr → M (table rule) := λ e , do bgc ← state.bgc <$> get, bigram.get_triggers bgc e
 meta def get_path : M _ := state.path <$> get
 meta def get_rule_table : M rule_table := state.rt <$> get
 meta def M.submatch (e : expr) : M (list rule_app) := do rt ← get_rule_table, rule_table.submatch e rt
@@ -46,17 +45,17 @@ meta def run_conv : conv unit → M unit := λ c, do
     state ← get,
     -- [FIXME] this operation is a perf bottleneck -- about 500ms
     /- Idea: store the lookahead as a table on addresses within the term.
-        Once you apply a rule, we only have to find the newly available rules in the lookahead. 
+        Once you apply a rule, we only have to find the newly available rules in the lookahead.
      -/
-    
+
     lookahead ← rule_table.rewrites ce' state.rt,
     -- lookahead ← if lookahead.empty then rule_table.rewrites ce' state.rt {wilds:=tt} else pure lookahead,
     -- tactic.trace_m "lookahead: " $ lookahead,
     let path := ce :: state.path,
     -- state_t.lift $ tactic.target >>= tactic.trace,
-    put { state with 
-      lookahead := lookahead, 
-      path := path 
+    put { state with
+      lookahead := lookahead,
+      path := path
     }
 
 @[reducible] def score := ℤ

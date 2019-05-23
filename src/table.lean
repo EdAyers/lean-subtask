@@ -9,7 +9,7 @@ section foldable
     (fold : ∀ {α σ : Type u}, (α → σ → σ) → σ → F α → σ)
 end foldable
 
-/-- Lightweight wrapper around `rbtree` because I keep swapping out 
+/-- Lightweight wrapper around `rbtree` because I keep swapping out
   which dictionary implementation I am using. -/
 meta def table (α : Type) : Type := rb_set α
 meta def dict (k : Type) (α : Type) : Type := rb_map k α
@@ -48,7 +48,7 @@ namespace table
     meta def first : table α → option α := fold (λ o a, option.rec_on o (some a) some) none -- [HACK] highly inefficient but I can't see a better way given the interface.
     meta def disjoint : table α → table α → bool := λ t₁ t₂, bnot $ any (λ a, contains a t₁) $ t₂
     meta instance [has_to_string α] : has_to_string (table α) := ⟨λ t, (λ s, "{|" ++ s ++ "|}") $ list.to_string $ to_list $ t⟩
-    meta instance has_to_tactic_format [has_to_tactic_format α] : has_to_tactic_format (table α) := 
+    meta instance has_to_tactic_format [has_to_tactic_format α] : has_to_tactic_format (table α) :=
         ⟨λ t, do
             items ← t.to_list.mmap (tactic.pp),
             pure $ to_fmt "{" ++ (format.group $ format.nest 1 $ format.join $ list.intersperse ("," ++ format.line) $ items ) ++ "}"⟩
@@ -58,9 +58,8 @@ namespace table
     @[reducible] meta def compare : table α → table α → Prop := λ t₁ t₂, to_list t₁ < to_list t₂
     meta def size : table α → ℕ := rb_set.size
     meta instance : has_lt (table α) := ⟨compare⟩
-        #check list.has_lt'
-    meta instance [decidable_eq α] : decidable_rel ((<) : table α → table α → Prop) 
-    | t₁ t₂ := 
+    meta instance [decidable_eq α] : decidable_rel ((<) : table α → table α → Prop)
+    | t₁ t₂ :=
         -- show decidable (compare t₁ t₂), from
         -- show decidable (to_list t₁ < to_list t₂), from
         show decidable (list.lex (<) (to_list t₁) (to_list t₂)), from
@@ -71,9 +70,9 @@ end table
 namespace dict
     variables {k : Type} [has_lt k] [decidable_rel ((<) : k → k → Prop)]
     variable {α : Type}
-    meta instance : has_sizeof (dict k α) := ⟨λ d, rb_map.size d⟩ 
+    meta instance : has_sizeof (dict k α) := ⟨λ d, rb_map.size d⟩
     meta def empty : dict k α := rb_map.mk k α
-    meta def is_empty : dict k α → bool := rb_map.empty 
+    meta def is_empty : dict k α → bool := rb_map.empty
     meta instance : has_emptyc (dict k α) := ⟨empty⟩
     meta def insert : k → α → dict k α → dict k α := λ k a d, rb_map.insert d k a
     meta def get : k → dict k α → option α := λ k d, rb_map.find d k
@@ -89,7 +88,7 @@ namespace dict
     Performance tip; it iterates over all members of `r` so make sure `r` is smaller than `l`.-/
     meta def merge (l r : dict k α) := rb_map.fold r l insert
     /--Merge two dictionaries calling `merger` in the event of a clash. Iterates over the second dictionary `r`.-/
-    meta def merge_with (merger : k → α → α → α) (l r : dict k α) : dict k α 
+    meta def merge_with (merger : k → α → α → α) (l r : dict k α) : dict k α
     := rb_map.fold r l $ λ k a acc, acc.modify (λ o, option.rec_on o a $ merger k a) k
     meta instance : has_append (dict k α) := ⟨merge⟩
     meta def fold {β} (r : β → k → α → β) (z : β) (d : dict k α) : β := rb_map.fold d z (λ k a b, r b k a)
@@ -107,7 +106,7 @@ namespace dict
     section formatting
         open format
         meta instance [has_to_string α] [has_to_string k] : has_to_string (dict k α) := ⟨λ d,  (λ s, "{" ++ s ++ "}") $ list.to_string $ dict.to_list $ d⟩
-        -- meta instance has_to_format [has_to_format α] [has_to_format k] : has_to_format (dict k α) := ⟨λ d, 
+        -- meta instance has_to_format [has_to_format α] [has_to_format k] : has_to_format (dict k α) := ⟨λ d,
         --     to_fmt "{" ++ group (nest 1 $ join $ list.intersperse ("," ++ line) $ list.map (λ (p:k×α), to_fmt p.1 ++ " ↦ " ++ to_fmt p.2) $ dict.to_list d) ++ to_fmt "}"
         -- ⟩
         meta instance has_to_tactic_format [has_to_tactic_format α] [has_to_tactic_format k] : has_to_tactic_format (dict k α) := ⟨λ d, do
@@ -129,11 +128,11 @@ namespace dictd
   meta def modify (f : α → α) (key : k) (dd : dictd k α) : dictd k α := ⟨dict.modify (λ o, f $ option.get_or_else o (dd.2 key)) key dd.1, dd.2⟩
 end dictd
 
-meta def tabledict (κ : Type) (α : Type) 
-    [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] 
+meta def tabledict (κ : Type) (α : Type)
+    [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)]
     [has_lt α] [decidable_rel ((<) : α → α → Prop)] : Type := dict κ (table α)
 
-namespace tabledict 
+namespace tabledict
     variables {κ α : Type} [has_lt κ] [decidable_rel ((<) : κ → κ → Prop)] [has_lt α] [decidable_rel ((<) : α → α → Prop)]
     meta def empty : tabledict κ α := dict.empty
     meta instance : has_emptyc (tabledict κ α) := ⟨empty⟩
@@ -186,10 +185,10 @@ namespace mtable
     meta instance : has_coe_to_fun (mtable κ) := ⟨λ _, κ → ℕ, λ t k, get k t⟩
     open format
     meta instance [has_to_tactic_format κ] : has_to_tactic_format (mtable κ) :=
-    ⟨λ t, do 
-            items ← list.mmap (λ (p:κ×ℕ), do 
-                ppk ← tactic.pp p.1, 
-                ppn ← tactic.pp p.2, 
+    ⟨λ t, do
+            items ← list.mmap (λ (p:κ×ℕ), do
+                ppk ← tactic.pp p.1,
+                ppn ← tactic.pp p.2,
                 pure $ ppn ++ "\t| " ++ ppk
             ) $ dict.to_list $ t,
             pure $ "{" ++ group (nest 1 $ format.join $ list.intersperse (to_fmt "," ++ line) $ items) ++ "}"

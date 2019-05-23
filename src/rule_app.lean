@@ -1,5 +1,5 @@
 /- Author: E.W.Ayers © 2019 -/
-import .util .table .expr_zipper
+import .util .table .expr_zipper .rule
 namespace robot
 open tactic robot expr
 
@@ -22,7 +22,7 @@ meta structure rule_app :=
 
 namespace rule_app
 
-meta instance : has_to_tactic_format rule_app := 
+meta instance : has_to_tactic_format rule_app :=
 ⟨λ r, do
   plhs ← tactic.pp r.lhs,
   prhs ← tactic.pp r.rhs,
@@ -62,7 +62,7 @@ meta def instantiate_mvars : rule_app → tactic rule_app
   lhs ← tactic.instantiate_mvars lhs,
   rhs ← tactic.instantiate_mvars rhs,
   pf ← tactic.instantiate_mvars pf,
-  pure $ {r:=r,lhs:=lhs,rhs:=rhs,adr:=adr,pf:=pf} 
+  pure $ {r:=r,lhs:=lhs,rhs:=rhs,adr:=adr,pf:=pf}
 
 meta def rule_rewrite : rule → zipper → tactic rule_app := λ r lhs, do
     T ← tactic.infer_type lhs.current,
@@ -97,7 +97,7 @@ meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
   target ← tactic.mk_app `eq [lhs.current,rhs],
   pf ← tactic.fabricate target (do
     -- [FIXME] `unify` is the performance bottleneck.
-    -- timetac "unify" $ 
+    -- timetac "unify" $
     --tactic.unify r.lhs lhs.current transparency.none tt,
     -- timetac "apply_core" $
     tactic.apply_core r.pf {md := transparency.none, unify := tt, instances := ff},
@@ -105,7 +105,7 @@ meta def head_rewrite : rule_app → zipper → tactic rule_app := λ r lhs, do
     pure ()
   ),
   (rhs',pf') ← zipper.apply_congr (rhs,pf) lhs,
-  let adr := zipper.address lhs ++ r.adr, 
+  let adr := zipper.address lhs ++ r.adr,
   let ra : rule_app := { r := r.r,  lhs:= lhs.unzip, rhs := rhs', adr := adr , pf := pf' },
   ra ← instantiate_mvars ra,
   pure ra
