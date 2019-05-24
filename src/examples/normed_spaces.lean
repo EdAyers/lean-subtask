@@ -26,12 +26,12 @@ attribute [equate] dist_self
 @[equate] lemma power_def_succ {α : Type u} [monoid α] {a : α} {n : ℕ} : a ^ (nat.succ n) = a * (a ^ n) := rfl
 @[equate] lemma power_def_zero {α : Type u} [monoid α] {a : α} : a ^ 0 = 1 := rfl
 
-@[simp] lemma normed_field.norm_pow {α : Type*} [normed_field α] (a : α) : ∀ n : ℕ, ∥a^n∥ = ∥a∥^n := 
+@[simp] lemma normed_field.norm_pow {α : Type*} [normed_field α] (a : α) : ∀ n : ℕ, ∥a^n∥ = ∥a∥^n :=
 begin
     intro n,
-    induction n,
+    induction n with n,
     simp,
-    equate
+    equate -- this can also be done with simp
 end
 
 

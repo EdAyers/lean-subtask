@@ -5,36 +5,36 @@ universe u
 
 attribute [equate] is_group_hom.mul
 
-section additive_groups 
+section additive_groups
     variables {α : Type u} [add_comm_group α] {u v w x y z : α}
-    example : (x + y) + z = (z + x) + y := 
+    example : (x + y) + z = (z + x) + y :=
     by equate
-    example : x + y + z = z + x + y := 
+    example : x + y + z = z + x + y :=
     by equate
-    example : x + (y - z) = -z + y + x := 
+    example : x + (y - z) = -z + y + x :=
     by equate
-    example : x - (y + z) = x - y - z := 
+    example : x - (y + z) = x - y - z :=
     by equate
-    example : - (x - y) = y + - x := 
+    example : - (x - y) = y + - x :=
     by equate
-    example : - (x - y) = y - x := 
+    example : - (x - y) = y - x :=
     by equate
     example : (x - y) = -(y - x) := -- [FIXME]
     by equate
     example : (x - y) = -(y + - x) := -- [FIXME]
     by equate
-    example : (- - x) + - y = -(y - x) := 
+    example : (- - x) + - y = -(y - x) :=
     by equate
     example : (- - x) - y = -(y - x) := -- [FIXME]
     by equate
-    example : (x + y) + (z + w) = (x + z) + (y + w) := 
+    example : (x + y) + (z + w) = (x + z) + (y + w) :=
     by equate
-    example : v + u + (x + y) + (z + w) = (x + z) + (y + w) + v + u := 
+    example : v + u + (x + y) + (z + w) = (x + z) + (y + w) + v + u :=
     by equate
-    lemma X1 : x + y + z + u + v + w = w + (x + y + z + u + v) := 
+    lemma X1 : x + y + z + u + v + w = w + (x + y + z + u + v) :=
     by equate
     #print X1
-    lemma X2 : x + y + z + u + v + w = w + (x + y + z + u + v) := 
+    lemma X2 : x + y + z + u + v + w = w + (x + y + z + u + v) :=
     by (tactic.timetac "ac_refl" $ tactic.ac_refl)
     #print X2
 end additive_groups
@@ -55,19 +55,19 @@ section powers
     @[equate] lemma my_pow_2 : a^2 = a * a := by equate -- [FIXME]
     @[equate] lemma my_pow_add : a^(m + n) = a^m * a^n :=
     begin
-        induction m, 
+        induction m,
         simp,
         equate
     end
     @[equate] lemma my_one_pow : (1:M)^n = (1:M) :=
     begin
         induction n,
-        equate, 
+        equate,
         equate
     end
-    @[equate] lemma my_pow_mul : (a^n)^m = a^(n * m) := 
+    @[equate] lemma my_pow_mul : (a^n)^m = a^(n * m) :=
     begin
-        induction m, 
+        induction m,
         equate,
         equate
     end
@@ -92,7 +92,7 @@ section group_powers
         induction n,
         simp,
         equate
-    end 
+    end
 end group_powers
 
 section group_homs1
@@ -103,26 +103,26 @@ section group_homs1
     := by equate
     -- example : x * y = (x * z²) * (z⁻² * y)
     -- := by equate
-    def conj (h x : G) := h * x * h ⁻¹ 
+    def conj (h x : G) := h * x * h ⁻¹
     @[equate] lemma conj_def : conj h x = h * x * h ⁻¹ := rfl
-    example {h : G} : conj h (x) * conj h (y) = conj h (x * y) := 
+    example {h : G} : conj h (x) * conj h (y) = conj h (x * y) :=
     by equate
-    example {h : G} : conj h (x * y) = conj h x * conj h y := 
+    example {h : G} : conj h (x * y) = conj h x * conj h y :=
     by equate -- [FIXME]
-    example {h : G} : (conj h x)⁻¹ = conj h (x⁻¹):= 
+    example {h : G} : (conj h x)⁻¹ = conj h (x⁻¹):=
     by equate
-    example {h : G} : (conj h x⁻¹) = (conj h x)⁻¹ := 
+    example {h : G} : (conj h x⁻¹) = (conj h x)⁻¹ :=
     by equate -- [FIXME]
     example : x * y⁻¹ = (y * x⁻¹)⁻¹
     := by equate
     example :  (y * x⁻¹)⁻¹ = x * y⁻¹
     := by equate
-    example [is_group_hom φ] [is_group_hom ψ] {x y : G} 
+    example [is_group_hom φ] [is_group_hom ψ] {x y : G}
         : is_group_hom (φ ∘ ψ) := ⟨λ x y, by equate⟩
-    example 
-        [is_group_hom φ] 
-        (i1 : ∀ x, φ(ψ x) = x) 
-        (i2 : ∀ x, ψ(φ x) = x) {x y : G} 
+    example
+        [is_group_hom φ]
+        (i1 : ∀ x, φ(ψ x) = x)
+        (i2 : ∀ x, ψ(φ x) = x) {x y : G}
         : is_group_hom ψ :=
     ⟨λ a b, by equate⟩
 end group_homs1

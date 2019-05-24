@@ -18,15 +18,15 @@ lemma q.ext {α : Type u} [integral_domain α] : Π (q1 q2 : q α), q1.n = q2.n 
 
 instance (α : Type u) [integral_domain α] : setoid (q α) :=
 { r := (λ a b, a.1 * b.2 = b.1 * a.2)
-, iseqv := 
+, iseqv :=
   ⟨ λ a, rfl
   , λ a b, eq.symm
-  , λ ⟨a,b,_⟩ ⟨c,d,h⟩ ⟨e,f,_⟩ 
-     (p : a * d = c * b) 
+  , λ ⟨a,b,_⟩ ⟨c,d,h⟩ ⟨e,f,_⟩
+     (p : a * d = c * b)
      (q : c * f = e * d),
     suffices d * (a * f) = d * (e * b), from eq_of_mul_eq_mul_left h this,
-    -- by blast -- 2200ms
-    by equate -- 1500ms
+    -- by blast -- takes about 2 seconds
+    by equate -- also about 2 seconds, but much slower because implemented in Lean VM
   ⟩
 }
 def free (α : Type u) [integral_domain α] : Type* := @quotient (q α) (by apply_instance)
@@ -34,19 +34,19 @@ variables {α : Type u} [integral_domain α]
 
 -- [TODO]
 -- namespace free
--- def add : free α → free α → free α 
--- := λ x y, quotient.lift_on₂ x y 
---   (λ x y, ⟦(⟨x.1 * y.2 + y.1 * x.2, x.2 * y.2, mul_ne_zero x.nz y.nz⟩ : q α)⟧) 
+-- def add : free α → free α → free α
+-- := λ x y, quotient.lift_on₂ x y
+--   (λ x y, ⟦(⟨x.1 * y.2 + y.1 * x.2, x.2 * y.2, mul_ne_zero x.nz y.nz⟩ : q α)⟧)
 --   (λ a1 a2 b1 b2,
 --       assume p : a1.n * b1.d = b1.1 * a1.2,
 --       assume q : a2.1 * b2.2 = b2.1 * a2.2,
---       suffices (a1.1 * a2.2 + a2.1 * a1.2) * (b1.2 * b2.2) 
---                 = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2), 
+--       suffices (a1.1 * a2.2 + a2.1 * a1.2) * (b1.2 * b2.2)
+--                 = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2),
 --         from quotient.sound this,
---         calc ((a1.1 * a2.2) + (a2.1 * a1.2)) * (b1.2 * b2.2) 
---               = ((b1.1 * a1.2) * (a2.2 * b2.2) + (b1.2 * a1.2) * (b2.1 * a2.2)) 
+--         calc ((a1.1 * a2.2) + (a2.1 * a1.2)) * (b1.2 * b2.2)
+--               = ((b1.1 * a1.2) * (a2.2 * b2.2) + (b1.2 * a1.2) * (b2.1 * a2.2))
 --                 : by equate
---          ...  = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2)                     
+--          ...  = (b1.1 * b2.2 + b2.1 * b1.2) * (a1.2 * a2.2)
 --                 : by symmetry; clear p q; equate
 --   )
 -- end free

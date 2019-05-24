@@ -11,12 +11,12 @@ section
     @[equate] def rev_nil : reverse ([] : list α) = [] := rfl
     @[equate] def reverse_core_def : reverse_core (h :: t) l = reverse_core t (h :: l) := rfl
     @[equate] def append_nil : l ++ [] = l := begin induction l, refl, simp end
-    @[equate] theorem rev_cons (a : α) (l : list α) : reverse (a::l) = reverse l ++ [a] := 
+    @[equate] theorem rev_cons (a : α) (l : list α) : reverse (a::l) = reverse l ++ [a] :=
     begin
             have aux : ∀ l₁ l₂, reverse_core l₁ l₂ ++ [a] = reverse_core l₁ (l₂ ++ [a]),
             intro l₁, induction l₁, intros, refl,
-            intro, 
-            equate, 
+            intro,
+            equate,
             equate
     end
     open list
@@ -28,9 +28,9 @@ section
     end -- `induction l; simp *`
     lemma rev_app_rev : reverse (l ++ s) = reverse s ++ reverse l :=
     begin
-        induction l,
+        induction l with h l H,
         equate,
-        equate 
+        equate
     end
 end
 
@@ -50,19 +50,19 @@ namespace my_nat
     @[equate] lemma add_succ : (s(x)) + y = s(x + y) := rfl
     @[equate] lemma nat_assoc {x y z : my_nat} :  x + ( y + z ) = (x + y) + z :=
     begin
-        induction x,
+        induction x with x,
         equate,
         equate
     end
     @[equate] lemma succ_add : y + (s(x)) = s(y + x) := begin
-        induction y, equate, equate
+        induction y with y, equate, equate
     end
-    @[equate] lemma zero_add : x + my_nat.zero = x := begin 
+    @[equate] lemma zero_add : x + my_nat.zero = x := begin
         induction x, equate, symmetry, equate -- [FIXME] remove symmetry
     end
     @[equate] lemma add_comm : x + y = y + x := begin
-        induction x, 
-        rw zero_add, refl, 
+        induction x with x,
+        rw zero_add, refl,
         equate
     end
 end my_nat
